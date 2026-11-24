@@ -190,7 +190,7 @@ export function AppShell() {
     );
   }
 
-  if (!banner && runtime.communityPrompts && invitation) {
+  if (!banner && runtime.communityPrompts && invitation && !proxyEnabled) {
     const discord = invitation === 'discord';
     const close = () => setInvitation(null);
     banner = (

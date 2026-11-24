@@ -1,4 +1,4 @@
-import { ArrowUpRight, AudioLines, ChevronRight, Info, Mic2, MonitorSmartphone, Palette, Play, Plug, Smartphone, Tv, Users, Wrench, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, AudioLines, ChevronRight, Info, Mic2, MonitorSmartphone, Palette, Play, Plug, Smartphone, Users, type LucideIcon } from 'lucide-react';
 import { Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { lazyRecovering } from '@/lib/staleBuild';
 import { MdOutlineExtension } from 'react-icons/md';
@@ -343,12 +343,9 @@ export default function SettingsPage() {
           <Section id="about" title="About">
             <section className={settingsUi.group}>
               <ExternalRow href={config.androidAppUrl} icon={<Glyph Icon={Smartphone} color="#2fa84f" />} title="B.Zik for Android" value="Download" />
-              <ExternalRow href={links.tv} icon={<Glyph Icon={Tv} color="#3478f6" />} title="B.Zik on TV" />
-              <ExternalRow href="https://alphakorner.github.io/B.Zik/addons/" icon={<Glyph Icon={Wrench} color="#e5483a" />} title="Build an add-on" />
               <ExternalRow href={links.github} icon={<Glyph Icon={SiGithub} color="#24292f" />} title="Source code" value="GitHub" />
-              <ExternalRow href={links.discord} icon={<Glyph Icon={SiDiscord} color="#5865f2" />} title="Community" value="Discord" />
             </section>
-            <p className={settingsUi.footer}>B.Zik is free and open source. Report bugs, suggest features and share the add-ons you build.</p>
+            <p className={settingsUi.footer}>App Zik Brice — logiciel libre (GPL-3.0), amélioré par Brice Jacotet.</p>
           </Section>
         </div>
       </div>
