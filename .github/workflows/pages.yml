@@ -36,7 +36,7 @@ jobs:
         env:
           OPENTUNE_WEB_BASE: /B.Zik/player/
           # URL du Worker proxy (Settings > Secrets and variables > Actions > Variables > BZIK_PROXY)
-          VITE_BZIK_PROXY: ${{ vars.BZIK_PROXY }}
+          VITE_BZIK_PROXY: ${{ vars.BZIK_PROXY || 'https://bzik-appzikbj.strassweb67.workers.dev' }}
         run: |
           pnpm install --no-frozen-lockfile
           pnpm --filter @opentune/app build
