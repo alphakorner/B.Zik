@@ -573,6 +573,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
   const entry = state.queue[at];
   if (!entry) return;
   primeAudio(); // synchrone, dans le geste de l'utilisateur
+  const prevStatus = usePlayer.getState().status;
   cancelCrossfade();
   const token = ++loadToken;
   // Where this load starts; kept if it fails, so Try Again starts there too.
@@ -592,6 +593,46 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
   updateMediaSession(usePlayer.getState().nowPlaying);
   try {
     const all = await getDecks();
+    // Choix manuel pendant une lecture : fondu enchaîné de 1,5 s. Un seul lecteur reste actif à la fin, l'ancien est coupé.
+    const front0 = all[active]!;
+    if (!auto && autoplay && startSec === 0 && prevStatus === 'playing' && !front0.audio.paused && front0.audio.currentTime > 0.3) {
+      const back = all[1 - active]!;
+      void back.engine.stop().catch(() => {});
+      back.gain = 0;
+      applyVolumes();
+      fade = { token, frame: 0, pending: true };
+      try {
+        const track = await back.engine.load(entry.track.videoId, { startSec: 0, autoplay: true, hint: searchHintOf(entry.track) });
+        if (token !== loadToken) return;
+        fade.pending = false;
+        const from = front0;
+        const to = back;
+        active = 1 - active;
+        resumeSec = 0;
+        usePlayer.setState((s) => ({ deck: s.deck + 1, status: 'playing' }));
+        applyTrack(track, entry.track);
+        afterTrackStarted();
+        const started = performance.now();
+        const step = () => {
+          if (!fade || fade.token !== token) return;
+          const t = Math.min(1, (performance.now() - started) / MANUAL_FADE_MS);
+          from.gain = Math.cos((t * Math.PI) / 2);
+          to.gain = Math.sin((t * Math.PI) / 2);
+          applyVolumes();
+          if (t < 1) fade.frame = window.setTimeout(step, FADE_STEP_MS);
+          else { fade = null; to.gain = 1; from.gain = 1; void from.engine.stop().catch(() => {}); applyVolumes(); }
+        };
+        step();
+        return;
+      } catch (error) {
+        if (token !== loadToken || (error instanceof Error && error.name === 'SupersededError')) return;
+        fade = null;
+        void back.engine.stop().catch(() => {});
+        void front0.engine.stop().catch(() => {});
+        back.gain = 1; front0.gain = 1; applyVolumes();
+        throw error;
+      }
+    }
     const deck = all[active]!;
     all[1 - active]!.engine.stop().catch(() => {});
     deck.gain = 1;
@@ -756,6 +797,8 @@ function refillAutoplay(force = false): Promise<void> {
  * the volumes out from the clock, so a late step only lands further along.
  */
 const FADE_STEP_MS = 40;
+/** Fondu enchaîné d'un choix manuel (toucher un titre pendant une lecture). */
+const MANUAL_FADE_MS = 1500;
 
 let fade: { token: number; frame: number; pending: boolean } | null = null;
 

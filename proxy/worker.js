@@ -16,7 +16,7 @@ function cors(origin) {
   };
 }
 
-const VERSION = 'v5.1';
+const VERSION = 'v5.2';
 
 // ---- Flux audio résolu côté Worker (v5) ---------------------------------------
 // Les URLs googlevideo sont liées à l'IP qui a fait l'appel /player. Depuis Cloudflare, l'IP de sortie
@@ -29,7 +29,7 @@ const PLAYER_CLIENTS = [
 ];
 const resolved = new Map(); // videoId -> { url, mime, size, meta, at }
 const TTL_MS = 90_000;
-const CHUNK = 2 * 1024 * 1024; // taille max d'une plage servie ; le navigateur enchaîne les requêtes
+const CHUNK = 1024 * 1024; // taille max d'une plage servie ; le navigateur enchaîne les requêtes
 
 async function resolveStream(id, skipFrom = 0) {
   for (let i = skipFrom; i < PLAYER_CLIENTS.length; i++) {
@@ -66,7 +66,10 @@ async function handleAudio(request, id, origin) {
   const h = cors(origin);
   if (!/^[\w-]{11}$/.test(id)) return new Response('id invalide', { status: 400, headers: h });
   let skipFrom = 0;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const mr = (request.headers.get('Range') || '').match(/bytes=(\d+)-/);
+  // Passé 1 Mo, les URL IOS/ANDROID sans PO token sont refusées : 1 seule tentative (échec rapide → reprise côté navigateur).
+  const tries = mr && Number(mr[1]) >= CHUNK ? 1 : 5;
+  for (let attempt = 0; attempt < tries; attempt++) {
     const st = await getStream(id, attempt > 0, skipFrom);
     if (!st) break;
     // googlevideo refuse (403) les plages ouvertes « bytes=0- » des clients IOS/ANDROID : on borne toujours la plage.
@@ -82,7 +85,7 @@ async function handleAudio(request, id, origin) {
       return new Response(up.body, { status: up.status, headers: out });
     }
     up.body?.cancel();
-    if (attempt === 1) skipFrom = Math.min(st.from + 1, PLAYER_CLIENTS.length - 1); // 2e échec : autre client
+    if (attempt % 2 === 1) skipFrom = Math.min(st.from + 1, PLAYER_CLIENTS.length - 1); // 2e échec : autre client
     resolved.delete(id);
   }
   return new Response('Flux indisponible', { status: 502, headers: h });
