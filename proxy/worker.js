@@ -39,9 +39,11 @@ export default {
     const needsOrigin = url.pathname.startsWith('/youtubei/') || url.pathname.startsWith('/api/jnn/GenerateIT');
     if (!isGV && needsOrigin) {
       // Comme la règle declarativeNetRequest de l'extension : Origin/Referer YouTube.
-      headers.set('Origin', 'https://music.youtube.com');
-      headers.set('Referer', 'https://music.youtube.com/');
-      headers.set('X-Origin', 'https://music.youtube.com');
+      // L'Origin doit correspondre à l'hôte appelé (www.youtube.com ou music.youtube.com), sinon 400 « XD3 ».
+      const self = 'https://' + url.hostname;
+      headers.set('Origin', self);
+      headers.set('Referer', self + '/');
+      headers.set('X-Origin', self);
       if (request.method === 'POST') headers.set('Content-Type', 'application/json');
     }
     const upstream = await fetch(url.toString(), {
