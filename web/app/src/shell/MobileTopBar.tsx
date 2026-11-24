@@ -3,20 +3,18 @@ import { PrefetchLink } from '@/components/PrefetchLink';
 import { LogoMark } from '@/components/icons/LogoMark';
 import { useUi } from '@/state/ui';
 
-/** Below 484px the sidebar folds into this bar and a drawer (report §11). */
+/** Barre du haut sur tous les écrans : logo + nom à gauche, bouton rond de menu à droite (ouvre la navigation). */
 export function MobileTopBar() {
   const setDrawerOpen = useUi((s) => s.setDrawerOpen);
   return (
-    <header className="hidden max-sm:absolute max-sm:inset-x-0 max-sm:top-0 max-sm:z-[calc(var(--z-web-chrome)-2)] max-sm:grid max-sm:h-(--mobile-top-bar-height) max-sm:grid-cols-[44px_1fr_44px] max-sm:items-center max-sm:px-3.5 max-sm:glass-material">
-      <button className="grid size-11 place-items-center rounded-full" aria-label="Open menu" onClick={() => setDrawerOpen(true)}>
-        <Menu size={22} strokeWidth={2} />
-      </button>
-      <PrefetchLink to="/home" className="inline-flex items-center gap-1.5 justify-self-center type-[700_16px/20px]" aria-label="B.Zik, Home">
-        <LogoMark size={20} className="text-primary" />
+    <header className="absolute inset-x-0 top-0 z-[calc(var(--z-web-chrome)-2)] flex h-(--mobile-top-bar-height) items-center justify-between px-4 glass-material">
+      <PrefetchLink to="/home" className="inline-flex items-center gap-2 type-[700_19px/24px] tracking-[-0.01em]" aria-label="B.Zik, Home">
+        <LogoMark size={24} bare className="text-primary" />
         <span>B.Zik</span>
       </PrefetchLink>
-      <span className="w-11" />
+      <button className="ot-menu-round grid size-10 place-items-center rounded-full" aria-label="Menu" onClick={() => setDrawerOpen(true)}>
+        <Menu size={20} strokeWidth={2.2} />
+      </button>
     </header>
   );
 }
-

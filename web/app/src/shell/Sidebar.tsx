@@ -181,7 +181,7 @@ export function Sidebar() {
     <>
       {/* Below 484px the sidebar is a drawer opened from the top bar's menu button. */}
       <nav
-        className="ot-side absolute inset-y-0 left-0 z-(--z-web-chrome) flex w-(--web-navigation-width) flex-col glass-material max-sm:w-[min(300px,82vw)] max-sm:-translate-x-full max-sm:shadow-glass max-sm:transition-transform max-sm:duration-(--duration-panel) max-sm:ease-panel max-sm:data-[open=true]:translate-none"
+        className="ot-side absolute inset-y-0 left-0 z-(--z-web-chrome) flex w-(--web-navigation-width) flex-col glass-material w-[min(300px,82vw)] -translate-x-full shadow-glass transition-transform duration-(--duration-panel) ease-panel data-[open=true]:translate-none"
         data-open={drawerOpen}
         data-folded={folded}
         aria-label="Main"
@@ -195,7 +195,7 @@ export function Sidebar() {
           </PrefetchLink>
           {/* Folds the sidebar to a rail of icons and back. Phones have the drawer instead. */}
           <button
-            className="ot-side-fold grid size-8 flex-none place-items-center rounded-nav text-secondary transition-colors duration-150 hover:bg-quinary hover:text-primary max-sm:hidden"
+            className="ot-side-fold grid size-8 flex-none place-items-center rounded-nav text-secondary transition-colors duration-150 hover:bg-quinary hover:text-primary hidden"
             onClick={toggleSidebar}
             aria-label={folded ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-expanded={!folded}
@@ -241,7 +241,7 @@ export function Sidebar() {
           </div>
         </div>
       </nav>
-      {drawerOpen && <div className="absolute inset-0 z-[calc(var(--z-web-chrome)-1)] hidden animate-fade bg-scrim max-sm:block" onClick={close} aria-hidden="true" />}
+      {drawerOpen && <div className="absolute inset-0 z-[calc(var(--z-web-chrome)-1)] block animate-fade bg-scrim" onClick={close} aria-hidden="true" />}
     </>
   );
 }

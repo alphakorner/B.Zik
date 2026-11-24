@@ -504,3 +504,8 @@
 :root[data-appearance='dark'] body, :root[data-appearance='dark'] .ot-app { background-image: radial-gradient(120% 60% at 0% 0%, rgba(255, 45, 135, .20), transparent 55%), radial-gradient(90% 50% at 100% 10%, rgba(122, 60, 255, .22), transparent 60%), radial-gradient(110% 50% at 50% 100%, rgba(255, 122, 47, .14), transparent 65%); background-attachment: fixed; }
 .ot-player-backdrop { background: linear-gradient(155deg, color-mix(in srgb, var(--cover-color) 70%, #ff2d87), #2a0f3d 55%, #0d0714 95%); transition: background .8s ease; }
 .ot-press, .ot-set-hero-button, .ot-circle-button { transition-duration: .35s; }
+
+/* Plein écran : plus de barre latérale fixe, la navigation vit dans le menu rond en haut à droite. */
+:root, :root[data-sidebar='collapsed'] { --web-navigation-width: 0px !important; }
+.ot-menu-round { background: linear-gradient(135deg, rgba(255, 45, 135, .92), rgba(122, 60, 255, .92)); color: #fff; box-shadow: 0 6px 20px rgba(255, 45, 135, .35), inset 0 0 0 1px rgba(255, 255, 255, .22); transition: scale .2s var(--ot-ease-settle), filter .2s; }
+.ot-menu-round:active { scale: .92; filter: brightness(1.1); }
