@@ -10,7 +10,7 @@ import { create } from 'zustand';
 
 const KEY = 'bzik:embed';
 export const useEmbedSettings = create<{ enabled: boolean; setEnabled: (on: boolean) => void }>((set) => ({
-  enabled: (() => { try { return localStorage.getItem(KEY) !== 'off'; } catch { return true; } })(),
+  enabled: (() => { try { return localStorage.getItem(KEY) === 'on'; } catch { return false; } })(),
   setEnabled: (enabled) => { try { localStorage.setItem(KEY, enabled ? 'on' : 'off'); } catch { /* ignoré */ } set({ enabled }); },
 }));
 
