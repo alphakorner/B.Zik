@@ -7,6 +7,7 @@ import { useExtension } from '@/extension/useExtension';
 import { usePublishedExtension } from '@/extension/useExtensionUpdate';
 import { useHostAccess } from '@/extension/useHostAccess';
 import { isMobileBrowser } from '@/lib/platform';
+import { proxyEnabled } from '@/lib/proxy';
 import { LYRIC_EXTENSION_ORIGINS } from '@/lyrics/http';
 
 const mobile = isMobileBrowser();
@@ -90,7 +91,7 @@ export function useAllowGate(): { locked: boolean; gate: ReactNode } {
   const steps = [extensionStep, lyricsStep, addonsStep];
   const allDone = steps.every((s) => s === 'done');
   // Someone who has been through it before isn't shown it while the checks run, only if one fails.
-  const needed = mobile ? false : steps.includes('todo') || (!rememberedDone() && !allDone);
+  const needed = mobile || proxyEnabled ? false : steps.includes('todo') || (!rememberedDone() && !allDone);
 
   // Once open it stays open until "Start Listening", so the last step's tick is seen.
   const [open, setOpen] = useState(false);
@@ -115,6 +116,7 @@ export function useAllowGate(): { locked: boolean; gate: ReactNode } {
       .catch((e: unknown) => setHint(e instanceof Error ? e.message : 'The extension couldn’t open its permission page.'));
   }, [addons.waiting]);
 
+  if (proxyEnabled) return { locked: false, gate: null };
   const shown = needed || open;
   if (!shown) return { locked: false, gate: null };
 

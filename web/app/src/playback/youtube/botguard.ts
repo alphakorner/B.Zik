@@ -14,6 +14,7 @@ import type { BotGuardClient } from 'bgutils-js/botguard';
 import type { IBotguardClientSideBgChallenge, WebPoSignalOutput } from 'bgutils-js/shared-types';
 import type { WebPoMinter } from 'bgutils-js/webpo';
 import { getBridge } from '@/extension/bridge';
+import { proxyEnabled, viaProxy } from '@/lib/proxy';
 import { timed, trackLog } from '../trackLog';
 
 const REQUEST_KEY = 'O43z0dpjhgX20SCx4KAo';
@@ -82,13 +83,19 @@ class BotguardService {
     const webPoSignalOutput: WebPoSignalOutput = [];
     const botguardResponse = await this.client.snapshot({ webPoSignalOutput });
     const bridge = getBridge();
-    if (!bridge) throw new Error('BotGuard needs the extension to request an integrity token');
-    const integrityResponse = await bridge.call('yt.fetch', {
-      url: buildURL('GenerateIT', true),
-      method: 'POST',
-      headers,
-      body: JSON.stringify([REQUEST_KEY, botguardResponse]),
-    });
+    if (!bridge && !proxyEnabled) throw new Error('BotGuard needs the extension to request an integrity token');
+    const integrityResponse = bridge
+      ? await bridge.call('yt.fetch', {
+          url: buildURL('GenerateIT', true),
+          method: 'POST',
+          headers,
+          body: JSON.stringify([REQUEST_KEY, botguardResponse]),
+        })
+      : await fetch(viaProxy(buildURL('GenerateIT', true)), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: JSON.stringify([REQUEST_KEY, botguardResponse]),
+        }).then(async (r) => ({ status: r.status, body: await r.text() }));
     if (integrityResponse.status !== 200) throw new Error(`GenerateIT answered ${integrityResponse.status}`);
     const [integrityToken, ttlSeconds] = JSON.parse(integrityResponse.body) as [string?, number?];
     if (!integrityToken) throw new Error(`No integrity token (interpreter ${challenge.interpreterHash})`);

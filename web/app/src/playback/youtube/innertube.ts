@@ -1,5 +1,6 @@
 import type { Innertube, Types } from 'youtubei.js/web';
 import { getBridge } from '@/extension/bridge';
+import { proxyEnabled, viaProxy } from '@/lib/proxy';
 import { ensureYtAuth, identityOf, noteMusicIdentity } from '@/extension/useYtAuth';
 import { trackLog } from '../trackLog';
 
@@ -70,6 +71,16 @@ async function simpleRequestFetch(input: RequestInfo | URL, init?: RequestInit):
   const request = input instanceof Request ? input : null;
   const url = new URL(request ? request.url : input.toString());
 
+  const useProxy = proxyEnabled && !getBridge();
+  if (useProxy && YOUTUBE_HOSTS.has(url.hostname)) {
+    const proxied = new Headers();
+    new Headers(init?.headers ?? request?.headers).forEach((v, k) => { if (SAFELISTED.has(k.toLowerCase())) proxied.set(k, v); });
+    const m = init?.method ?? request?.method ?? 'GET';
+    let b: BodyInit | null | undefined = init?.body;
+    if (b === undefined && request && m !== 'GET' && m !== 'HEAD') b = await request.text();
+    if (b != null) proxied.set('Content-Type', 'text/plain;charset=UTF-8');
+    return fetch(viaProxy(url), { method: m, headers: proxied, body: b ?? null, signal: init?.signal ?? request?.signal ?? null, credentials: 'omit' });
+  }
   if (!YOUTUBE_HOSTS.has(url.hostname) || url.pathname.startsWith('/api/jnn/')) {
     return fetch(input, init);
   }

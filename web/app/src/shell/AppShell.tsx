@@ -20,6 +20,7 @@ import { MobileTopBar } from './MobileTopBar';
 import { PlayerBar } from './PlayerBar';
 import { SidePanel } from './SidePanel';
 import { useAllowGate } from './AllowGate';
+import { proxyEnabled } from '@/lib/proxy';
 import { Appearance } from './Appearance';
 import { MobileDock } from './MobileDock';
 import { RoomNotice } from './RoomNotice';
@@ -160,7 +161,9 @@ export function AppShell() {
   }, []);
 
   let banner = null;
-  if (mobile) {
+  if (proxyEnabled) {
+    banner = null;
+  } else if (mobile) {
     banner = (
       <Banner
         title="B.Zik is better in the app."

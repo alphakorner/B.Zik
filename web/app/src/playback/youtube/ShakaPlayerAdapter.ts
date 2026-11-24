@@ -10,6 +10,8 @@
 
 import shaka from 'shaka-player/dist/shaka-player.compiled';
 
+import { getBridge } from '@/extension/bridge';
+import { proxyEnabled, viaProxy } from '@/lib/proxy';
 import { FormatKeyUtils, type CacheManager, type RequestMetadataManager, isGoogleVideoURL } from 'googlevideo/utils';
 
 import type { SabrFormat } from 'googlevideo/shared-types';
@@ -429,6 +431,15 @@ export class ShakaPlayerAdapter implements SabrPlayerAdapter {
     };
 
     networkingEngine.registerRequestFilter(this.requestFilter);
+    this.registerProxyFilter(networkingEngine);
+  }
+
+  /** Sans extension : les segments googlevideo passent par le proxy B.Zik. */
+  private registerProxyFilter(engine: shaka.net.NetworkingEngine): void {
+    if (!proxyEnabled || getBridge()) return;
+    engine.registerRequestFilter(async (_type, request) => {
+      request.uris = request.uris.map((u) => (isGoogleVideoURL(u) ? viaProxy(u) : u));
+    });
   }
 
   public registerResponseInterceptor(interceptor: ResponseFilter): void {
