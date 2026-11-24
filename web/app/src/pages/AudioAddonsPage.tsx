@@ -1,3 +1,4 @@
+import { proxyEnabled } from '@/lib/proxy';
 import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { SiYoutubemusic } from 'react-icons/si';
@@ -70,9 +71,9 @@ export default function AudioAddonsPage() {
           <span className="ot-saavn-mark" aria-hidden="true">J</span>
           <span className={settingsUi.rowText}>
             <span>JioSaavn</span>
-            <span className={settingsUi.rowDetail}>320 kbps AAC, while FLAC is looked for and when there is none</span>
+            <span className={settingsUi.rowDetail}>{proxyEnabled ? 'Désactivé : B.Zik web joue uniquement YouTube Music' : '320 kbps AAC, while FLAC is looked for and when there is none'}</span>
           </span>
-          <input type="checkbox" role="switch" className={settingsUi.switch} checked={jioSaavn} onChange={e => setJioSaavn(e.target.checked)} />
+          <input type="checkbox" role="switch" className={settingsUi.switch} checked={jioSaavn} disabled={proxyEnabled} onChange={e => setJioSaavn(e.target.checked)} />
         </label>
         <div className={`${settingsUi.integrationPlain} !grid-cols-[minmax(0,1fr)_auto]`}>
           <span className={settingsUi.rowText}>

@@ -3,14 +3,16 @@ import { currentConfig } from '@/config/remote';
 import { endpoint, flacInfo, manifestOf, matches, publicHttps, qualityParams, type Addon, type CatalogTrack, type Recording } from '@opentune/shared/addons';
 import { BridgeCallError } from '@opentune/shared/bridge';
 import { getBridge } from '@/extension/bridge';
+import { proxyEnabled } from '@/lib/proxy';
 import { fetchPublished, mergeCatalog } from './catalog';
 import { askHost } from './hostAccess';
 import { needsVerification, verificationHeaders } from './verification';
 const KEY = 'opentune:audio-addons';
 const SAAVN_KEY = 'opentune:jiosaavn';
 /** Twenty of the listener's own and twenty published ones at most. */
-function read(): Addon[] { try { const v = JSON.parse(localStorage.getItem(KEY) ?? '[]'); return Array.isArray(v) ? v.filter(x => typeof x?.url === 'string' && typeof x?.name === 'string').slice(0, 40) : []; } catch { return []; } }
-function readSaavn(): boolean { try { return localStorage.getItem(SAAVN_KEY) !== 'false'; } catch { return true; } }
+function read(): Addon[] { if (proxyEnabled) return []; try { const v = JSON.parse(localStorage.getItem(KEY) ?? '[]'); return Array.isArray(v) ? v.filter(x => typeof x?.url === 'string' && typeof x?.name === 'string').slice(0, 40) : []; } catch { return []; } }
+/** Web sans extension : YouTube Music uniquement (JioSaavn et les modules exigent l'extension, et coupaient la lecture). */
+function readSaavn(): boolean { if (proxyEnabled) return false; try { return localStorage.getItem(SAAVN_KEY) !== 'false'; } catch { return true; } }
 export const useAddons = create<{
   sources: Addon[]; update: (sources: Addon[]) => void; status: string; checkingVideoId: string | null;
   /** JioSaavn's 320 kbps AAC, played while (or when no) FLAC is found. On by default, as on Android. */
@@ -21,7 +23,7 @@ export const useAddons = create<{
   sources: read(), status: '', checkingVideoId: null, locked: [],
   update: sources => { try { localStorage.setItem(KEY, JSON.stringify(sources)); } catch { /* Kept for this session. */ } set({ sources }); },
   jioSaavn: readSaavn(),
-  setJioSaavn: jioSaavn => { try { localStorage.setItem(SAAVN_KEY, String(jioSaavn)); } catch { /* Kept for this session. */ } set({ jioSaavn }); },
+  setJioSaavn: jioSaavn => { if (proxyEnabled) return; try { localStorage.setItem(SAAVN_KEY, String(jioSaavn)); } catch { /* Kept for this session. */ } set({ jioSaavn }); },
 }));
 
 /**

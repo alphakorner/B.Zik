@@ -274,7 +274,7 @@ export class YouTubeEngine {
             videoId,
           );
           const addons = useAddons.getState();
-          if (tryAddons && (addons.jioSaavn || addons.sources.some(s => s.enabled))) void this.upgradeAddon(track, generation, hint);
+          if (tryAddons && !proxyEnabled && (addons.jioSaavn || addons.sources.some(s => s.enabled))) void this.upgradeAddon(track, generation, hint);
           return track;
         } catch (error) {
           if (error instanceof SupersededError) throw error;
