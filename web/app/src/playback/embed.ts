@@ -79,7 +79,7 @@ async function ensurePlayer(): Promise<YTPlayer> {
       const timer = setTimeout(() => { ready = null; reject(new Error('Lecteur YouTube trop lent')); }, 12000);
       const p = new yt.Player(host, {
         width: '220', height: '220',
-        playerVars: { autoplay: 1, controls: 1, playsinline: 1, rel: 0, modestbranding: 1, enablejsapi: 1, origin: location.origin },
+        playerVars: { autoplay: 1, controls: 0, fs: 0, disablekb: 1, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1, rel: 0, modestbranding: 1, enablejsapi: 1, origin: location.origin },
         events: {
           onReady: () => { clearTimeout(timer); player = p; p.setVolume(volume); resolve(p); },
           onStateChange: (e: { data: number }) => {
@@ -97,12 +97,24 @@ async function ensurePlayer(): Promise<YTPlayer> {
   return ready;
 }
 
-/** Plein écran : la vidéo s'affiche en grand au centre, sous le titre ; sinon, petite carte à droite au-dessus du lecteur. */
-export function setEmbedFull(full: boolean): void {
-  const c = ensureCard();
-  Object.assign(c.style, full
-    ? { left: '50%', right: 'auto', top: '110px', bottom: 'auto', width: 'min(86vw, 340px)', height: 'min(86vw, 340px)', transform: 'translateX(-50%)' }
-    : { left: 'auto', right: '12px', top: 'auto', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 112px)', width: '220px', height: '220px', transform: 'none' });
+let full = false;
+let syncTimer: number | undefined;
+/** Plein écran : la vidéo prend exactement la place de la pochette (même case, mêmes coins) ; sinon petite carte à droite. */
+function syncLayout(): void {
+  if (!card) return;
+  const cover = full ? document.querySelector<HTMLElement>('.ot-player-cover') : null;
+  if (cover) {
+    const r = cover.getBoundingClientRect();
+    const size = Math.max(200, Math.min(r.width, r.height)); // YouTube exige au moins 200×200 visibles
+    Object.assign(card.style, { left: `${r.left + (r.width - size) / 2}px`, top: `${r.top + (r.height - size) / 2}px`, right: 'auto', bottom: 'auto', width: `${size}px`, height: `${size}px`, borderRadius: '28px', transform: 'none', boxShadow: 'none' });
+  } else {
+    Object.assign(card.style, { left: 'auto', right: '12px', top: 'auto', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 112px)', width: '220px', height: '220px', borderRadius: '16px', transform: 'none', boxShadow: '0 10px 40px rgba(0,0,0,.45)' });
+  }
+}
+export function setEmbedFull(on: boolean): void {
+  full = on; ensureCard(); syncLayout();
+  clearInterval(syncTimer);
+  if (on) syncTimer = window.setInterval(syncLayout, 250); // suit la pochette (animations, rotation, défilement)
 }
 
 let hint: HTMLDivElement | null = null;
@@ -133,6 +145,7 @@ export async function playEmbedded(videoId: string, h: EmbedHandlers, startSec =
   handlers = h;
   activeId = videoId;
   ensureCard().style.display = 'block';
+  syncLayout();
   p.loadVideoById(videoId, startSec);
   p.playVideo();
   armHint();
