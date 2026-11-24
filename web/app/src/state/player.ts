@@ -1,5 +1,5 @@
 import { startLoadingSound, stopLoadingSound, attachSound, unlockSound } from '@/playback/sound';
-import { embedActive, embedSeek, embedSetVolume, embedToggle, playEmbedded, stopEmbedded, useEmbedSettings } from '@/playback/embed';
+import { embedActive, embedSeek, embedSetVolume, embedToggle, playEmbedded, preloadEmbed, stopEmbedded, useEmbedSettings } from '@/playback/embed';
 import { proxyEnabled } from '@/lib/proxy';
 import type { DetectedExtension } from '@opentune/shared/bridge';
 import { create } from 'zustand';
@@ -607,7 +607,7 @@ async function embedFallback(entry: QueueEntry, token: number): Promise<boolean>
         if (planNext(true)) setTimeout(() => { if (token === loadToken) void advance(true); }, 1500);
       },
     });
-    usePlayer.setState({ status: 'playing', error: null });
+    usePlayer.setState({ status: 'buffering', error: null }); // 'playing' arrive du lecteur YouTube lui-même
     return true;
   } catch (error) {
     trackLog.w(`lecteur de secours indisponible : ${String(error)}`, entry.track.videoId);
@@ -637,7 +637,7 @@ function watchStall(deck: Deck, entry: QueueEntry, token: number): void {
       onState: (state) => { if (token === loadToken || embedActive()) usePlayer.setState({ status: state, error: null }); },
       onEnded: () => { if (token === loadToken) void advance(true).then(intent); },
       onError: () => { if (token === loadToken) usePlayer.setState({ status: 'error', error: 'Lecture indisponible' }); },
-    }, at).then(() => usePlayer.setState({ status: 'playing', error: null })).catch(() => {});
+    }, at).then(() => usePlayer.setState({ status: 'buffering', error: null })).catch(() => {});
   }, 500);
 }
 
@@ -647,6 +647,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
   const entry = state.queue[at];
   if (!entry) return;
   primeAudio(); // synchrone, dans le geste de l'utilisateur
+  if (proxyEnabled && useEmbedSettings.getState().enabled) preloadEmbed();
   unlockSound();
   stopEmbedded();
   const prevStatus = usePlayer.getState().status;

@@ -2,8 +2,8 @@
    generous rounded artwork, solid full-player controls and a glass mini-player. */
 @layer base {
   :root {
-    --ot-seed: #e53935;
-    --ot-accent-choice: #e53935;
+    --ot-seed: #ff2d87;
+    --ot-accent-choice: #ff2d87;
     --radius-artwork-small: 12px;
     --radius-artwork-medium: 20px;
     --radius-artwork-large: 28px;
@@ -499,3 +499,8 @@
 @keyframes ot-cover-breathe { 0%, 100% { opacity: .65; transform: scale(.97); } 50% { opacity: 1; transform: scale(1); } }
 @keyframes ot-load-sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
 @media (prefers-reduced-motion: reduce) { .ot-mini[data-loading] .ot-mini-track img, .ot-mini-load { animation: none; } }
+
+/* Palette « coucher de soleil néon » : rose vif → orange → violet profond, fondus doux (inspiration Miami). */
+:root[data-appearance='dark'] body, :root[data-appearance='dark'] .ot-app { background-image: radial-gradient(120% 60% at 0% 0%, rgba(255, 45, 135, .20), transparent 55%), radial-gradient(90% 50% at 100% 10%, rgba(122, 60, 255, .22), transparent 60%), radial-gradient(110% 50% at 50% 100%, rgba(255, 122, 47, .14), transparent 65%); background-attachment: fixed; }
+.ot-player-backdrop { background: linear-gradient(155deg, color-mix(in srgb, var(--cover-color) 70%, #ff2d87), #2a0f3d 55%, #0d0714 95%); transition: background .8s ease; }
+.ot-press, .ot-set-hero-button, .ot-circle-button { transition-duration: .35s; }

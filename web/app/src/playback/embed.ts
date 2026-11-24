@@ -84,7 +84,7 @@ async function ensurePlayer(): Promise<YTPlayer> {
           onReady: () => { clearTimeout(timer); player = p; p.setVolume(volume); resolve(p); },
           onStateChange: (e: { data: number }) => {
             if (!handlers) return;
-            if (e.data === 1) handlers.onState('playing');
+            if (e.data === 1) { hideHint(); handlers.onState('playing'); }
             else if (e.data === 2) handlers.onState('paused');
             else if (e.data === 3) handlers.onState('buffering');
             else if (e.data === 0) handlers.onEnded();
@@ -97,6 +97,28 @@ async function ensurePlayer(): Promise<YTPlayer> {
   return ready;
 }
 
+let hint: HTMLDivElement | null = null;
+let hintTimer: number | undefined;
+function hideHint(): void { clearTimeout(hintTimer); if (hint) hint.style.display = 'none'; }
+/** Si le navigateur bloque le démarrage automatique, on le dit : un tap sur le ▶ du lecteur suffit. */
+function armHint(): void {
+  clearTimeout(hintTimer);
+  hintTimer = window.setTimeout(() => {
+    if (activeId === null || !card) return;
+    try { if (player?.getPlayerState() === 1) return; } catch { /* ignoré */ }
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.style.cssText = 'position:absolute;left:0;right:0;top:0;padding:8px 10px;font:600 13px system-ui;color:#fff;background:linear-gradient(90deg,#ff2d87,#7a3cff);text-align:center;pointer-events:none';
+      hint.textContent = 'Touche ▶ pour lancer la lecture';
+      card.appendChild(hint);
+    }
+    hint.style.display = 'block';
+  }, 2500);
+}
+
+/** Précharge l'API et le lecteur (à appeler dès le premier geste) : le relais est alors prêt en un instant. */
+export function preloadEmbed(): void { void ensurePlayer().catch(() => { /* réessayé au moment du besoin */ }); }
+
 /** Joue [videoId] dans le lecteur YouTube intégré ; résout quand le lecteur a pris la commande. */
 export async function playEmbedded(videoId: string, h: EmbedHandlers, startSec = 0): Promise<void> {
   const p = await ensurePlayer();
@@ -105,13 +127,14 @@ export async function playEmbedded(videoId: string, h: EmbedHandlers, startSec =
   ensureCard().style.display = 'block';
   p.loadVideoById(videoId, startSec);
   p.playVideo();
+  armHint();
 }
 
 export function embedActive(): boolean { return activeId !== null; }
 
 export function stopEmbedded(): void {
   if (activeId === null) return;
-  activeId = null; handlers = null;
+  activeId = null; handlers = null; hideHint();
   try { player?.stopVideo(); } catch { /* lecteur déjà détruit */ }
   if (card) card.style.display = 'none';
 }

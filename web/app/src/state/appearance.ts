@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export const ACCENTS = [
-  ['Red', '#e53935'], ['Amber', '#ff6f00'], ['Yellow', '#fdd835'], ['Green', '#43a047'],
+  ['Vice Pink', '#ff2d87'], ['Sunset', '#ff7a2f'], ['Miami Violet', '#7a3cff'], ['Neon Teal', '#17d4c4'], ['Red', '#e53935'], ['Amber', '#ff6f00'], ['Yellow', '#fdd835'], ['Green', '#43a047'],
   ['Teal', '#00897b'], ['Sky', '#039be5'], ['Indigo', '#3949ab'], ['Purple', '#8e24aa'],
   ['Pink', '#d81b60'], ['Brown', '#6d4c41'],
 ] as const;
@@ -18,7 +18,7 @@ export interface Appearance {
   liquidGlass: boolean;
 }
 export const DEFAULT_APPEARANCE: Appearance = {
-  mode: 'system', accent: '#e53935', pureBlack: true, artworkColors: true,
+  mode: 'dark', accent: '#ff2d87', pureBlack: true, artworkColors: true,
   playerBackground: 'mesh', playerStyle: 'classic', motion: true, liquidGlass: true,
 };
 export function appearanceOf(value: unknown): Appearance {
