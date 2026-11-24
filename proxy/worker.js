@@ -35,7 +35,9 @@ export default {
     headers.set('Accept-Language', request.headers.get('Accept-Language') || 'en-US,en;q=0.9');
     headers.set('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
     const isGV = /googlevideo\.com$/.test(url.hostname);
-    if (!isGV) {
+    // Origin/Referer YouTube uniquement pour les appels d'API (les pages et scripts les refusent : 400).
+    const needsOrigin = url.pathname.startsWith('/youtubei/') || url.pathname.startsWith('/api/jnn/GenerateIT');
+    if (!isGV && needsOrigin) {
       // Comme la règle declarativeNetRequest de l'extension : Origin/Referer YouTube.
       headers.set('Origin', 'https://music.youtube.com');
       headers.set('Referer', 'https://music.youtube.com/');
