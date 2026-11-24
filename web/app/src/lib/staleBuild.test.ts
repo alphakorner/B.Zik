@@ -8,7 +8,7 @@ const memory = () => {
 
 describe('stale build recovery', () => {
   it('knows a missing code file in each browser’s words', () => {
-    expect(isChunkLoadError(new TypeError('Failed to fetch dynamically imported module: https://justshivv.github.io/Opentune/player/assets/LyricsPanel-jCXkBUBv.js'))).toBe(true);
+    expect(isChunkLoadError(new TypeError('Failed to fetch dynamically imported module: https://alphakorner.github.io/B.Zik/player/assets/LyricsPanel-jCXkBUBv.js'))).toBe(true);
     expect(isChunkLoadError(new TypeError('error loading dynamically imported module: https://x/a.js'))).toBe(true);
     expect(isChunkLoadError(new TypeError('Importing a module script failed.'))).toBe(true);
     expect(isChunkLoadError(new Error('Unable to preload CSS for /assets/a.css'))).toBe(true);

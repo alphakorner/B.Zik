@@ -24,4 +24,4 @@ export function isLibrarySection(value: string): value is LibrarySection {
 export const LIKED_MUSIC_PLAYLIST = 'LM';
 
 /** The playlist Connect keeps its secret in (connect/accountSync.ts): never shown in the library. */
-export const CONNECT_PLAYLIST_TITLE = 'OpenTune Connect';
+export const CONNECT_PLAYLIST_TITLE = 'B.Zik Connect';

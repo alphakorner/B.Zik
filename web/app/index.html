@@ -6,9 +6,15 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f1f1f" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
-    <title>OpenTune · Web player</title>
-    <meta name="description" content="Listen with OpenTune in your browser. Your music library, lyrics and community audio add-ons." />
+    <title>B.Zik · Web player</title>
+    <meta name="description" content="Listen with B.Zik in your browser. Your music library, lyrics and community audio add-ons." />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="B.Zik" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- DM Sans is the app's typeface (web/docs/apple-music-dom.md, "Font"). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,7 +24,7 @@
     />
     <style>
       /* The opening's first part, drawn with the page itself so it shows on the first paint, before
-         any script has loaded: OpenTune's white mark on black, settling with a glint across it, on
+         any script has loaded: B.Zik's white mark on black, settling with a glint across it, on
          the GPU so it stays smooth while the player loads. src/shell/opening.ts takes over from it
          for the dive into the mark once the player is ready. The mask is logo-mark.svg's wave. */
       #ot-splash { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; background: #000; pointer-events: none; }
@@ -46,6 +52,11 @@
       } catch (e) {}
     </script>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator && location.protocol === 'https:') {
+        window.addEventListener('load', function () { navigator.serviceWorker.register('%BASE_URL%sw.js').catch(function () {}); });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

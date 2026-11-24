@@ -165,10 +165,10 @@ function ExtensionCard() {
   const yt = useYtAuth();
   const present = extension.state === 'present';
   return (
-    <section className="ot-set-hero" aria-label="OpenTune Extension">
+    <section className="ot-set-hero" aria-label="B.Zik Extension">
       <LogoMark size={26} className="ot-set-mark" />
       <div className="ot-set-hero-text">
-        <p className="type-title-3-emphasized">{present ? 'Extension connected' : 'OpenTune on the web'}</p>
+        <p className="type-title-3-emphasized">{present ? 'Extension connected' : 'B.Zik on the web'}</p>
         <p className="type-body-tall text-secondary">
           {present
             ? `Version ${extension.extension.info.version} · YouTube Music: ${youtubeText(yt)}`
@@ -184,7 +184,7 @@ function ExtensionCard() {
 
 /**
  * Settings (SettingsSheet on the phone): sources and playback first, then
- * how it looks, the accounts it uses, Listen Together, and where OpenTune
+ * how it looks, the accounts it uses, Listen Together, and where B.Zik
  * lives. One page, grouped rows, a list of the sections beside it.
  */
 export default function SettingsPage() {
@@ -289,7 +289,7 @@ export default function SettingsPage() {
               <LinkRow
                 to="/extension"
                 icon={<Glyph Icon={MdOutlineExtension} color="#636366" />}
-                title="OpenTune Extension"
+                title="B.Zik Extension"
                 value={present ? `v${extension.extension.info.version}` : 'Not installed'}
               />
             </section>
@@ -298,7 +298,7 @@ export default function SettingsPage() {
                 label="Share listening activity to YouTube"
                 detail={
                   present && !extension.extension.info.capabilities.includes('yt.stats')
-                    ? 'Update the OpenTune extension to share: this version can’t send plays to YouTube.'
+                    ? 'Update the B.Zik extension to share: this version can’t send plays to YouTube.'
                     : 'Songs you play here go to your YouTube Music history and shape its recommendations.'
                 }
                 checked={shareHistory}
@@ -342,13 +342,13 @@ export default function SettingsPage() {
 
           <Section id="about" title="About">
             <section className={settingsUi.group}>
-              <ExternalRow href={config.androidAppUrl} icon={<Glyph Icon={Smartphone} color="#2fa84f" />} title="OpenTune for Android" value="Download" />
-              <ExternalRow href={links.tv} icon={<Glyph Icon={Tv} color="#3478f6" />} title="OpenTune on TV" />
-              <ExternalRow href="https://justshivv.github.io/Opentune/addons/" icon={<Glyph Icon={Wrench} color="#e5483a" />} title="Build an add-on" />
+              <ExternalRow href={config.androidAppUrl} icon={<Glyph Icon={Smartphone} color="#2fa84f" />} title="B.Zik for Android" value="Download" />
+              <ExternalRow href={links.tv} icon={<Glyph Icon={Tv} color="#3478f6" />} title="B.Zik on TV" />
+              <ExternalRow href="https://alphakorner.github.io/B.Zik/addons/" icon={<Glyph Icon={Wrench} color="#e5483a" />} title="Build an add-on" />
               <ExternalRow href={links.github} icon={<Glyph Icon={SiGithub} color="#24292f" />} title="Source code" value="GitHub" />
               <ExternalRow href={links.discord} icon={<Glyph Icon={SiDiscord} color="#5865f2" />} title="Community" value="Discord" />
             </section>
-            <p className={settingsUi.footer}>OpenTune is free and open source. Report bugs, suggest features and share the add-ons you build.</p>
+            <p className={settingsUi.footer}>B.Zik is free and open source. Report bugs, suggest features and share the add-ons you build.</p>
           </Section>
         </div>
       </div>

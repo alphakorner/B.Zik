@@ -2,7 +2,7 @@ import markSvg from '@/assets/logo-mark.svg?raw';
 import { DIVE_MS, MAX_STEP_MS, drawDive } from './openingDraw';
 
 /**
- * The opening, as the phone app has it (app/…/ui/components/OpeningReveal.kt): OpenTune's white
+ * The opening, as the phone app has it (app/…/ui/components/OpeningReveal.kt): B.Zik's white
  * mark on black settles with a glint of light across it, then the screen dives into it. The mark
  * turns into a window onto the player, outlined in white, and rushes toward you until the player
  * fills the screen. The player behind never moves: it is simply revealed.

@@ -1,0 +1,18 @@
+{
+  "name": "B.Zik",
+  "short_name": "B.Zik",
+  "description": "B.Zik — lecteur musical par Brice Jacotet · Alpha Korner",
+  "id": "/B.Zik/player/",
+  "start_url": "/B.Zik/player/",
+  "scope": "/B.Zik/player/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["music", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

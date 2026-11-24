@@ -6,8 +6,8 @@
  */
 export type Invitation = 'star' | 'discord';
 
-export const GITHUB_URL = 'https://github.com/justshivv/Opentune';
-export const DISCORD_URL = 'https://discord.gg/6udrCVh5n';
+export const GITHUB_URL = 'https://github.com/alphakorner/B.Zik';
+export const DISCORD_URL = 'https://alpha-korner.com';
 
 const KEY = 'opentune:invitations';
 const DAY = 86_400_000;

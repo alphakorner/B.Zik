@@ -13,7 +13,7 @@ const PREFIX = 'opentune-connect:v1:';
 const SECRET = /opentune-connect:v1:([A-Za-z0-9_-]{43})/;
 
 export const description = (group: ConnectGroup) =>
-  `Lets your OpenTune devices find each other. Keep it private; deleting it only stops them joining by themselves.\n${PREFIX}${group.encoded}`;
+  `Lets your B.Zik devices find each other. Keep it private; deleting it only stops them joining by themselves.\n${PREFIX}${group.encoded}`;
 
 /** The secret in any text from the playlist's page, or null. */
 export const secretIn = (text: string): string | null => SECRET.exec(text)?.[1] ?? null;
