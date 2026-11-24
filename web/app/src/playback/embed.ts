@@ -10,7 +10,7 @@ import { create } from 'zustand';
 
 const KEY = 'bzik:embed';
 export const useEmbedSettings = create<{ enabled: boolean; setEnabled: (on: boolean) => void }>((set) => ({
-  enabled: (() => { try { return localStorage.getItem(KEY) === 'on'; } catch { return false; } })(),
+  enabled: (() => { try { return localStorage.getItem(KEY) !== 'off'; } catch { return true; } })(),
   setEnabled: (enabled) => { try { localStorage.setItem(KEY, enabled ? 'on' : 'off'); } catch { /* ignoré */ } set({ enabled }); },
 }));
 
@@ -108,7 +108,7 @@ function syncLayout(): void {
     const size = Math.max(200, Math.min(r.width, r.height)); // YouTube exige au moins 200×200 visibles
     Object.assign(card.style, { left: `${r.left + (r.width - size) / 2}px`, top: `${r.top + (r.height - size) / 2}px`, right: 'auto', bottom: 'auto', width: `${size}px`, height: `${size}px`, borderRadius: '28px', transform: 'none', boxShadow: 'none' });
   } else {
-    Object.assign(card.style, { left: 'auto', right: '12px', top: 'auto', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 112px)', width: '220px', height: '220px', borderRadius: '16px', transform: 'none', boxShadow: '0 10px 40px rgba(0,0,0,.45)' });
+    Object.assign(card.style, { left: '50%', right: 'auto', top: 'auto', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 150px)', width: '200px', height: '200px', borderRadius: '24px', transform: 'translateX(-50%)', boxShadow: '0 12px 40px rgba(255,45,135,.28), 0 0 0 1px rgba(255,255,255,.12)' });
   }
 }
 export function setEmbedFull(on: boolean): void {
