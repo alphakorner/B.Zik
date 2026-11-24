@@ -1,6 +1,7 @@
 import type { ApiResponse, Innertube, YT } from 'youtubei.js/web';
 import { trackLog } from '../trackLog';
 import { botguard } from './botguard';
+import { proxyEnabled } from '@/lib/proxy';
 
 /**
  * Which identity asks YouTube for a track, in order (prompt §5.2 step 5,
@@ -13,7 +14,16 @@ import { botguard } from './botguard';
  * "The page needs to be reloaded" and WEB_EMBEDDED "This video is unavailable",
  * so those two are left out. googlevideo's own SABR example uses VISIONOS.
  */
-export const CLIENT_ORDER = ['VISIONOS', 'YTMUSIC', 'WEB', 'MWEB'] as const;
+export const CLIENT_ORDER = ['VISIONOS', 'YTMUSIC', 'WEB', 'MWEB', 'IOS', 'ANDROID'] as const;
+
+/**
+ * Mode proxy (web app sans extension) : les requêtes partent d'IP de datacenter
+ * Cloudflare. Mesuré le 2026-11-24 via le Worker B.Zik : VISIONOS, ANDROID_VR et TV
+ * répondent « Sign in to confirm you're not a bot », alors que IOS et ANDROID
+ * répondent OK avec des URLs directes (pas de PoToken) en ~200 ms et que
+ * googlevideo sert les plages en 206. Ils passent donc en tête.
+ */
+const PROXY_ORDER = ['IOS', 'ANDROID', 'YTMUSIC', 'VISIONOS', 'WEB', 'MWEB'] as const;
 export type PlayerClientName = (typeof CLIENT_ORDER)[number];
 
 /**
@@ -37,7 +47,7 @@ async function playerRequestToken(yt: Innertube, client: PlayerClientName): Prom
 }
 
 /** StreamResolver: how many clients are worth trying for one track. */
-export const CLIENT_ATTEMPTS = 3;
+export const CLIENT_ATTEMPTS = 4;
 /** InnerTubeXResolver.EXCLUDE_MS: a client that refused a track sits out for this long. */
 const EXCLUDE_MS = 10 * 60_000;
 /** StreamResolver.UNPLAYABLE_TTL_MS: a settled "no" isn't asked again for this long. */
@@ -122,7 +132,8 @@ function clientOrder(): readonly PlayerClientName[] {
     ?.split(',')
     .map((c) => c.trim())
     .filter((c): c is PlayerClientName => (CLIENT_ORDER as readonly string[]).includes(c));
-  return forced?.length ? forced : CLIENT_ORDER;
+  if (forced?.length) return forced;
+  return proxyEnabled ? PROXY_ORDER : CLIENT_ORDER.filter((c) => c !== 'IOS' && c !== 'ANDROID');
 }
 
 /**
@@ -181,10 +192,13 @@ export async function playerRequest(
 }
 
 /** Why a playability status is a verdict on the track rather than on the client, or null if it isn't. */
-const AGE_GATE = /confirm your age|age-restricted|inappropriate for some users|sign in to confirm/;
+const AGE_GATE = /confirm your age|age-restricted|inappropriate for some users|sign in to confirm(?! you.{0,3}re not a bot)/;
+/** « Sign in to confirm you're not a bot » : verdict sur l'IP du client, pas sur le titre — un autre client peut passer. */
+const BOT_CHECK = /not a bot/;
 
 function permanentReason(status: string | undefined, reason: string | undefined, signedIn: boolean): string | null {
   const text = (reason ?? '').toLowerCase();
+  if (BOT_CHECK.test(text)) return null;
   if (AGE_GATE.test(text)) {
     return signedIn
       ? 'YouTube won’t serve this age-restricted track to this account. Check the account’s age is verified on YouTube.'
