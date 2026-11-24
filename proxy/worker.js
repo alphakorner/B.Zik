@@ -16,7 +16,7 @@ function cors(origin) {
   };
 }
 
-const VERSION = 'v5';
+const VERSION = 'v5.1';
 
 // ---- Flux audio résolu côté Worker (v5) ---------------------------------------
 // Les URLs googlevideo sont liées à l'IP qui a fait l'appel /player. Depuis Cloudflare, l'IP de sortie
@@ -29,6 +29,7 @@ const PLAYER_CLIENTS = [
 ];
 const resolved = new Map(); // videoId -> { url, mime, size, meta, at }
 const TTL_MS = 90_000;
+const CHUNK = 2 * 1024 * 1024; // taille max d'une plage servie ; le navigateur enchaîne les requêtes
 
 async function resolveStream(id, skipFrom = 0) {
   for (let i = skipFrom; i < PLAYER_CLIENTS.length; i++) {
@@ -68,7 +69,12 @@ async function handleAudio(request, id, origin) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const st = await getStream(id, attempt > 0, skipFrom);
     if (!st) break;
-    const up = await fetch(st.url, { headers: { Range: request.headers.get('Range') || 'bytes=0-', 'User-Agent': UA }, redirect: 'follow' });
+    // googlevideo refuse (403) les plages ouvertes « bytes=0- » des clients IOS/ANDROID : on borne toujours la plage.
+    const m = (request.headers.get('Range') || '').match(/bytes=(\d+)-(\d*)/);
+    const start = m ? Number(m[1]) : 0;
+    let end = m && m[2] ? Math.min(Number(m[2]), start + CHUNK - 1) : start + CHUNK - 1;
+    if (st.size) { if (start >= st.size) return new Response('Plage hors fichier', { status: 416, headers: { ...h, 'Content-Range': `bytes */${st.size}` } }); end = Math.min(end, st.size - 1); }
+    const up = await fetch(st.url, { headers: { Range: `bytes=${start}-${end}`, 'User-Agent': UA }, redirect: 'follow' });
     if (up.status === 200 || up.status === 206) {
       const out = new Headers(h);
       for (const k of ['Content-Length', 'Content-Range']) { const v = up.headers.get(k); if (v) out.set(k, v); }
