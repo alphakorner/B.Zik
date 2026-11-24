@@ -93,7 +93,7 @@ class BotguardService {
         })
       : await fetch(viaProxy(buildURL('GenerateIT', true)), {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          headers,
           body: JSON.stringify([REQUEST_KEY, botguardResponse]),
         }).then(async (r) => ({ status: r.status, body: await r.text() }));
     if (integrityResponse.status !== 200) throw new Error(`GenerateIT answered ${integrityResponse.status}`);

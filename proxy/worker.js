@@ -9,7 +9,7 @@ function cors(origin) {
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Range, Accept, Accept-Language',
+    'Access-Control-Allow-Headers': 'Content-Type, Range, Accept, Accept-Language, X-Goog-Api-Key, X-User-Agent',
     'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
@@ -36,7 +36,7 @@ export default {
     headers.set('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
     const isGV = /googlevideo\.com$/.test(url.hostname);
     // Origin/Referer YouTube uniquement pour les appels d'API (les pages et scripts les refusent : 400).
-    const needsOrigin = url.pathname.startsWith('/youtubei/') || url.pathname.startsWith('/api/jnn/GenerateIT');
+    const needsOrigin = url.pathname.startsWith('/youtubei/') || url.pathname.startsWith('/api/jnn/');
     if (!isGV && needsOrigin) {
       // Comme la règle declarativeNetRequest de l'extension : Origin/Referer YouTube.
       // L'Origin doit correspondre à l'hôte appelé (www.youtube.com ou music.youtube.com), sinon 400 « XD3 ».
@@ -44,7 +44,15 @@ export default {
       headers.set('Origin', self);
       headers.set('Referer', self + '/');
       headers.set('X-Origin', self);
-      if (request.method === 'POST') headers.set('Content-Type', 'application/json');
+      if (request.method === 'POST') {
+        // BotGuard (/api/jnn/) parle en protobuf-JSON et veut sa clé d'API ; l'API youtubei en JSON.
+        const jnn = url.pathname.startsWith('/api/jnn/');
+        headers.set('Content-Type', jnn ? 'application/json+protobuf' : 'application/json');
+        if (jnn) {
+          const key = request.headers.get('X-Goog-Api-Key'); if (key) headers.set('X-Goog-Api-Key', key);
+          headers.set('X-User-Agent', request.headers.get('X-User-Agent') || 'grpc-web-javascript/0.1');
+        }
+      }
     }
     const upstream = await fetch(url.toString(), {
       method: request.method,
