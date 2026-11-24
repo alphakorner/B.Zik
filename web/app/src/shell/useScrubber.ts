@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { seekRemote, useControlling } from '@/connect/connect';
 import { positionAt } from '@/connect/session';
 import { lengthSec } from '@/connect/shown';
+import { embedActive, embedPosition, embedSeek } from '@/playback/embed';
 import { getAudio, resumePosition, usePlayer } from '@/state/player';
 
 export function clock(seconds: number): string {
@@ -58,6 +59,21 @@ export function useScrubber() {
     const audio = getAudio();
     const element = bar.current;
     if (!element) return;
+    if (embedActive()) {
+      // Lecteur de secours YouTube : la barre suit la position du lecteur intégré.
+      let raf = 0;
+      const drawEmbed = () => {
+        const p = embedPosition();
+        const duration = p?.duration ?? 0;
+        const time = drag.current !== null && duration > 0 ? drag.current * duration : p?.time ?? 0;
+        element.style.setProperty('--progress', String(duration > 0 ? Math.min(1, Math.max(0, time / duration)) : 0));
+        if (elapsed.current) elapsed.current.textContent = clock(time);
+        if (remaining.current) remaining.current.textContent = `-${clock(duration - time)}`;
+        raf = window.setTimeout(drawEmbed, 250);
+      };
+      drawEmbed();
+      return () => clearTimeout(raf);
+    }
     if (!audio) {
       // A queue restored from the last visit: where it was left, until Play loads it.
       const time = resumePosition();
@@ -109,6 +125,7 @@ export function useScrubber() {
         seekRemote(fractionAt(e) * lengthSec(d.state?.track?.length) * 1000);
         return;
       }
+      if (embedActive()) { const p = embedPosition(); if (p && p.duration > 0) embedSeek(fractionAt(e) * p.duration); return; }
       const audio = getAudio();
       if (audio && Number.isFinite(audio.duration)) seek(fractionAt(e) * audio.duration);
     },
