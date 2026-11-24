@@ -1,3 +1,4 @@
+import { proxyEnabled } from '@/lib/proxy';
 import { ArrowUpRight, ListMusic, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { MdOutlineExtension } from 'react-icons/md';
@@ -209,6 +210,7 @@ export function Sidebar() {
           {spotifySignedIn && <SpotifyNav onNavigate={close} />}
         </div>
         <div className="ot-side-bottom flex flex-col gap-2 pt-3 pr-3 pb-5 pl-5">
+          {!proxyEnabled && (
           <PrefetchNavLink to="/extension" className={`${item} relative`} onClick={close} title={tip('B.Zik Extension')}>
             {/* Chrome's own toolbar glyph for extensions (Material "extension"). */}
             <span className={icon}>
@@ -221,6 +223,7 @@ export function Sidebar() {
               </span>
             )}
           </PrefetchNavLink>
+          )}
           <div className="ot-side-full flex flex-col">
             <AccountButton />
           </div>

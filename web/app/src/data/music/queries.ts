@@ -1,3 +1,4 @@
+import { proxyEnabled } from '@/lib/proxy';
 import {
   infiniteQueryOptions,
   queryOptions,
@@ -89,8 +90,8 @@ export const playlistQuery = (id: string) =>
 export function useYouTubeReady(): { ready: boolean; missing: boolean } {
   const extension = useExtension();
   return {
-    ready: extension.state === 'present' && extension.extension.info.capabilities.includes('yt'),
-    missing: extension.state === 'missing',
+    ready: proxyEnabled || (extension.state === 'present' && extension.extension.info.capabilities.includes('yt')),
+    missing: !proxyEnabled && extension.state === 'missing',
   };
 }
 
