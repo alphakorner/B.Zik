@@ -16,8 +16,12 @@ function cors(origin) {
   };
 }
 
+const VERSION = 'v4';
+
 export default {
   async fetch(request) {
+    // Contrôle de version : ouvrir https://<ton-worker>.workers.dev/?v dans le navigateur doit afficher « B.Zik proxy v4 ».
+    if (new URL(request.url).searchParams.has('v')) return new Response('B.Zik proxy ' + VERSION, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
     const origin = request.headers.get('Origin') || '';
     if (!ALLOWED_ORIGINS.includes(origin)) return new Response('Origin refusée', { status: 403 });
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
