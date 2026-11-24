@@ -3,7 +3,7 @@ import { findJioSaavn, type SaavnStream } from '@/addons/jiosaavn';
 import { SabrStreamingAdapter } from 'googlevideo/sabr-streaming-adapter';
 import { buildSabrFormat, isGoogleVideoURL } from 'googlevideo/utils';
 import { getBridge } from '@/extension/bridge';
-import { proxyEnabled, viaProxy } from '@/lib/proxy';
+import { proxyEnabled, proxyEndpoint, viaProxy } from '@/lib/proxy';
 import shaka from 'shaka-player/dist/shaka-player.compiled';
 import { Constants, Utils, YT, type Innertube } from 'youtubei.js/web';
 import { timed, trackLog } from '../trackLog';
@@ -146,6 +146,66 @@ export class YouTubeEngine {
     return player;
   }
 
+  private progressiveId: string | null = null;
+
+  /** Le flux Worker a lâché en cours de route : reprise au même endroit par la chaîne classique (Shaka). */
+  private progressiveFailed = () => {
+    const id = this.progressiveId;
+    if (!id || this.loading) return;
+    this.progressiveId = null;
+    trackLog.w('flux Worker interrompu; reprise par la chaîne classique', id);
+    void this.load(id, { startSec: this.audio.currentTime, autoplay: !this.audio.paused, tryAddons: false, progressive: false })
+      .then((t) => this.onRecovered(t))
+      .catch(() => this.onFatal(id, 'Audio source failed', false));
+  };
+
+  /**
+   * Mode proxy : le Worker (v5) résout le titre (clients IOS/ANDROID) ET télécharge l'audio dans la même
+   * invocation, donc l'IP liée à l'URL googlevideo ne change pas en cours de lecture. L'élément <audio> lit
+   * ce flux en direct (Range natif) : pas de Shaka, pas de session InnerTube, pas de BotGuard. Null = on
+   * retombe sur la chaîne classique.
+   */
+  private async tryProgressive(player: shaka.Player, videoId: string, startSec: number, autoplay: boolean, generation: number): Promise<LoadedTrack | null> {
+    if (!proxyEnabled || getBridge()) return null;
+    const audio = this.audio;
+    try {
+      const res = await fetch(proxyEndpoint('i', videoId));
+      this.checkCurrent(generation);
+      if (!res.ok) return null;
+      const meta = (await res.json()) as Omit<LoadedTrack, 'loudnessDb'>;
+      this.checkCurrent(generation);
+      await player.unload();
+      this.adapter?.dispose(); this.adapter = null; this.direct = null; this.current = null; this.addonTrack = null;
+      this.checkCurrent(generation);
+      audio.crossOrigin = 'anonymous';
+      audio.src = proxyEndpoint('a', videoId);
+      await new Promise<void>((resolve, reject) => {
+        const clean = () => { clearTimeout(timer); audio.removeEventListener('loadedmetadata', ok); audio.removeEventListener('error', bad); };
+        const ok = () => { clean(); resolve(); };
+        const bad = () => { clean(); reject(new Error('audio element error')); };
+        const timer = setTimeout(() => { clean(); reject(new Error('flux Worker: pas de métadonnées en 8 s')); }, 8000);
+        audio.addEventListener('loadedmetadata', ok); audio.addEventListener('error', bad);
+      });
+      this.checkCurrent(generation);
+      if (startSec > 0) audio.currentTime = startSec;
+      if (autoplay) {
+        await audio.play().catch((error: unknown) => {
+          if (!(error instanceof DOMException && error.name === 'NotAllowedError')) throw error;
+          trackLog.w('autoplay was blocked by the browser; waiting for a tap', videoId);
+        });
+      }
+      await this.firstAudio(generation, 8000);
+      this.progressiveId = videoId;
+      audio.addEventListener('error', this.progressiveFailed);
+      return { ...meta, thumbnails: meta.thumbnails ?? [], format: `${meta.format} · flux Worker`, loudnessDb: null };
+    } catch (error) {
+      if (error instanceof SupersededError) throw error;
+      trackLog.w(`flux Worker indisponible (${describe(error)}); chaîne classique`, videoId);
+      audio.pause(); audio.removeAttribute('src'); audio.load();
+      return null;
+    }
+  }
+
   /** Pays the cold costs before the first tap (InnerTubeXResolver.warm): the session, the player script, BotGuard. */
   async warm(): Promise<void> {
     this.yt ??= await getInnertube();
@@ -159,13 +219,17 @@ export class YouTubeEngine {
    */
   async load(
     videoId: string,
-    { startSec = 0, autoplay = true, tryAddons = true, hint }: {
+    { startSec = 0, autoplay = true, tryAddons = true, progressive = true, hint }: {
       startSec?: number; autoplay?: boolean; tryAddons?: boolean;
+      /** Mode proxy : essayer d'abord le flux résolu par le Worker (voir tryProgressive). */
+      progressive?: boolean;
       /** The YouTube Music names (the queue's): what other catalogs are searched by, not the video's channel. */
       hint?: { title: string; artist: string; album?: string | null };
     } = {},
   ): Promise<LoadedTrack> {
     useAddons.setState({ checkingVideoId: null });
+    this.audio.removeEventListener('error', this.progressiveFailed);
+    this.progressiveId = null;
     const generation = ++this.generation;
     this.loading = true;
     this.addonTrack = null;
@@ -173,6 +237,13 @@ export class YouTubeEngine {
     trackLog.i(`loading at ${startSec.toFixed(1)}s`, videoId);
     try {
       const player = await this.ensurePlayer();
+      if (progressive) {
+        const fast = await this.tryProgressive(player, videoId, startSec, autoplay, generation);
+        if (fast) {
+          trackLog.i(`playing via ${fast.client} (flux Worker), ${fast.format}, first audio after ${Math.round(performance.now() - started)}ms`, videoId);
+          return fast;
+        }
+      }
       this.yt ??= await timed('InnerTube session', videoId, getInnertube);
       void botguard.init().catch((error: unknown) => trackLog.w(`BotGuard init failed: ${String(error)}`, videoId));
 
@@ -512,7 +583,7 @@ export class YouTubeEngine {
   }
 
   /** Resolves once the element has data to play, or rejects after the timeout. */
-  private firstAudio(generation: number): Promise<void> {
+  private firstAudio(generation: number, timeoutMs = FIRST_AUDIO_TIMEOUT_MS): Promise<void> {
     const audio = this.audio;
     if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return Promise.resolve();
     return new Promise((resolve, reject) => {
@@ -524,8 +595,8 @@ export class YouTubeEngine {
       };
       const timer = setTimeout(() => {
         audio.removeEventListener('canplay', done);
-        reject(new Error(`no audio within ${FIRST_AUDIO_TIMEOUT_MS / 1000}s`));
-      }, FIRST_AUDIO_TIMEOUT_MS);
+        reject(new Error(`no audio within ${timeoutMs / 1000}s`));
+      }, timeoutMs);
       audio.addEventListener('canplay', done);
     });
   }

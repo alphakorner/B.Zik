@@ -16,7 +16,71 @@ function cors(origin) {
   };
 }
 
-const VERSION = 'v4';
+const VERSION = 'v5';
+
+// ---- Flux audio résolu côté Worker (v5) ---------------------------------------
+// Les URLs googlevideo sont liées à l'IP qui a fait l'appel /player. Depuis Cloudflare, l'IP de sortie
+// change entre deux requêtes distinctes du navigateur -> 403 en cours de lecture. Ici la résolution et le
+// téléchargement se font dans la MÊME invocation, et un 403 relance une résolution toute fraîche.
+const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+const PLAYER_CLIENTS = [
+  { clientName: 'IOS', clientVersion: '20.10.4', deviceMake: 'Apple', deviceModel: 'iPhone16,2', osName: 'iPhone', osVersion: '18.3.2.22D82', hl: 'en', gl: 'US' },
+  { clientName: 'ANDROID', clientVersion: '20.10.38', androidSdkVersion: 30, osName: 'Android', osVersion: '11', hl: 'en', gl: 'US' },
+];
+const resolved = new Map(); // videoId -> { url, mime, size, meta, at }
+const TTL_MS = 90_000;
+
+async function resolveStream(id, skipFrom = 0) {
+  for (let i = skipFrom; i < PLAYER_CLIENTS.length; i++) {
+    try {
+      const r = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: 'https://www.youtube.com', Referer: 'https://www.youtube.com/', 'X-Origin': 'https://www.youtube.com', 'User-Agent': UA },
+        body: JSON.stringify({ context: { client: PLAYER_CLIENTS[i] }, videoId: id, contentCheckOk: true, racyCheckOk: true }),
+      });
+      const j = await r.json();
+      if (j.playabilityStatus?.status !== 'OK') continue;
+      const audio = (j.streamingData?.adaptiveFormats || []).filter((f) => f.url && /^audio\/mp4/.test(f.mimeType || ''));
+      const f = audio.find((x) => x.itag === 140) || audio.sort((a, b) => b.bitrate - a.bitrate)[0];
+      if (!f) continue;
+      const d = j.videoDetails || {};
+      return {
+        url: f.url, mime: 'audio/mp4', size: Number(f.contentLength) || 0, at: Date.now(), client: PLAYER_CLIENTS[i].clientName, from: i,
+        meta: { videoId: id, title: d.title || '', author: d.author || '', durationSec: Number(d.lengthSeconds) || 0, thumbnails: (d.thumbnail?.thumbnails || []).slice().reverse(), format: `${f.itag} mp4a ${Math.round((f.bitrate || 0) / 1000)}kbps`, client: PLAYER_CLIENTS[i].clientName },
+      };
+    } catch { /* client suivant */ }
+  }
+  return null;
+}
+
+async function getStream(id, fresh = false, skipFrom = 0) {
+  const hit = resolved.get(id);
+  if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit;
+  const r = await resolveStream(id, skipFrom);
+  if (r) { if (resolved.size > 200) resolved.clear(); resolved.set(id, r); }
+  return r;
+}
+
+async function handleAudio(request, id, origin) {
+  const h = cors(origin);
+  if (!/^[\w-]{11}$/.test(id)) return new Response('id invalide', { status: 400, headers: h });
+  let skipFrom = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const st = await getStream(id, attempt > 0, skipFrom);
+    if (!st) break;
+    const up = await fetch(st.url, { headers: { Range: request.headers.get('Range') || 'bytes=0-', 'User-Agent': UA }, redirect: 'follow' });
+    if (up.status === 200 || up.status === 206) {
+      const out = new Headers(h);
+      for (const k of ['Content-Length', 'Content-Range']) { const v = up.headers.get(k); if (v) out.set(k, v); }
+      out.set('Content-Type', st.mime); out.set('Accept-Ranges', 'bytes'); out.set('Cache-Control', 'no-store');
+      return new Response(up.body, { status: up.status, headers: out });
+    }
+    up.body?.cancel();
+    if (attempt === 1) skipFrom = Math.min(st.from + 1, PLAYER_CLIENTS.length - 1); // 2e échec : autre client
+    resolved.delete(id);
+  }
+  return new Response('Flux indisponible', { status: 502, headers: h });
+}
 
 export default {
   async fetch(request) {
@@ -26,7 +90,14 @@ export default {
     if (!ALLOWED_ORIGINS.includes(origin)) return new Response('Origin refusée', { status: 403 });
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
 
-    const target = new URL(request.url).searchParams.get('u');
+    const sp = new URL(request.url).searchParams;
+    if (sp.has('a')) return handleAudio(request, sp.get('a'), origin);
+    if (sp.has('i')) {
+      const id = sp.get('i');
+      const st = /^[\w-]{11}$/.test(id) ? await getStream(id, true) : null;
+      return new Response(st ? JSON.stringify(st.meta) : '{"error":"indisponible"}', { status: st ? 200 : 502, headers: { ...cors(origin), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
+    const target = sp.get('u');
     let url;
     try { url = new URL(target); } catch { return new Response('URL invalide', { status: 400, headers: cors(origin) }); }
     if (url.protocol !== 'https:' || !ALLOWED_HOSTS.some((re) => re.test(url.hostname))) {

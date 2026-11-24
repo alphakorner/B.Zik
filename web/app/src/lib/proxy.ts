@@ -11,3 +11,8 @@ export function viaProxy(url: string | URL): string {
   if (!proxyEnabled || !HOST.test(u.hostname)) return u.toString();
   return `${PROXY}/?u=${encodeURIComponent(u.toString())}`;
 }
+
+/** Endpoints du Worker v5 : `i` = métadonnées du titre, `a` = flux audio (résolution + téléchargement dans la même invocation). */
+export function proxyEndpoint(kind: 'i' | 'a', videoId: string): string {
+  return `${PROXY}/?${kind}=${encodeURIComponent(videoId)}`;
+}
