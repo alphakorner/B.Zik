@@ -1,5 +1,6 @@
 import { startLoadingSound, stopLoadingSound, attachSound, unlockSound } from '@/playback/sound';
-import { embedActive, embedSeek, embedSetVolume, embedToggle, playEmbedded, preloadEmbed, stopEmbedded, useEmbedSettings } from '@/playback/embed';
+import { useUi } from '@/state/ui';
+import { embedActive, embedSeek, embedSetVolume, embedToggle, playEmbedded, preloadEmbed, setEmbedFull, stopEmbedded, useEmbedSettings } from '@/playback/embed';
 import { proxyEnabled } from '@/lib/proxy';
 import type { DetectedExtension } from '@opentune/shared/bridge';
 import { create } from 'zustand';
@@ -597,6 +598,8 @@ async function embedFallback(entry: QueueEntry, token: number): Promise<boolean>
     if (token !== loadToken) return true;
     lastEmbedAt = Date.now();
     trackLog.w('flux direct indisponible : lecteur YouTube de secours', entry.track.videoId);
+    useUi.getState().setFullScreen(true);
+    setEmbedFull(true);
     await playEmbedded(entry.track.videoId, {
       onState: (state) => { if (token === loadToken || embedActive()) usePlayer.setState({ status: state, error: null }); },
       onEnded: () => { if (token === loadToken) void advance(true).then(intent); },
@@ -633,6 +636,8 @@ function watchStall(deck: Deck, entry: QueueEntry, token: number): void {
     void deck.engine.stop().catch(() => {});
     lastEmbedAt = Date.now();
     trackLog.w('flux direct figé : lecteur de secours', entry.track.videoId);
+    useUi.getState().setFullScreen(true);
+    setEmbedFull(true);
     void playEmbedded(entry.track.videoId, {
       onState: (state) => { if (token === loadToken || embedActive()) usePlayer.setState({ status: state, error: null }); },
       onEnded: () => { if (token === loadToken) void advance(true).then(intent); },
@@ -1136,3 +1141,5 @@ usePlayer.subscribe((state, prev) => {
     stopLoadingSound();
   }
 });
+
+useUi.subscribe((u, prev) => { if (u.fullScreen !== prev.fullScreen) setEmbedFull(u.fullScreen); });

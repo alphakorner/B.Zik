@@ -60,8 +60,8 @@ function ensureCard(): HTMLDivElement {
   card.id = 'bzik-embed';
   card.setAttribute('aria-label', 'Lecteur YouTube');
   Object.assign(card.style, {
-    position: 'fixed', left: '12px', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 112px)', width: '220px', height: '220px',
-    zIndex: '60', borderRadius: '16px', overflow: 'hidden', background: '#000', boxShadow: '0 10px 40px rgba(0,0,0,.45)', display: 'none',
+    position: 'fixed', right: '12px', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 112px)', width: '220px', height: '220px',
+    zIndex: '10000', borderRadius: '16px', overflow: 'hidden', background: '#000', boxShadow: '0 10px 40px rgba(0,0,0,.45)', display: 'none',
   } satisfies Partial<CSSStyleDeclaration>);
   const host = document.createElement('div');
   host.style.cssText = 'width:100%;height:100%';
@@ -95,6 +95,14 @@ async function ensurePlayer(): Promise<YTPlayer> {
     });
   })();
   return ready;
+}
+
+/** Plein écran : la vidéo s'affiche en grand au centre, sous le titre ; sinon, petite carte à droite au-dessus du lecteur. */
+export function setEmbedFull(full: boolean): void {
+  const c = ensureCard();
+  Object.assign(c.style, full
+    ? { left: '50%', right: 'auto', top: '110px', bottom: 'auto', width: 'min(86vw, 340px)', height: 'min(86vw, 340px)', transform: 'translateX(-50%)' }
+    : { left: 'auto', right: '12px', top: 'auto', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 112px)', width: '220px', height: '220px', transform: 'none' });
 }
 
 let hint: HTMLDivElement | null = null;
