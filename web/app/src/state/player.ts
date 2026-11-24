@@ -580,7 +580,7 @@ let lastEmbedAt = 0;
 /** Mode web : si le flux direct ne démarre pas assez vite, on passe au lecteur de secours plutôt que d'attendre. */
 function withBudget<T>(deck: Deck, load: Promise<T>): Promise<T> {
   if (!proxyEnabled || !useEmbedSettings.getState().enabled) return load;
-  const ms = Date.now() - lastEmbedAt < 180_000 ? 7000 : 14000;
+  const ms = 4000; // bascule vers le secours si le 1er son n'arrive pas en 4 s
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => { void deck.engine.stop().catch(() => {}); reject(new Error('Flux direct trop lent')); }, ms);
     load.then((v) => { clearTimeout(timer); resolve(v); }, (e: unknown) => { clearTimeout(timer); reject(e); });
@@ -616,6 +616,30 @@ async function embedFallback(entry: QueueEntry, token: number): Promise<boolean>
 }
 
 
+
+/** Flux direct qui se fige en cours de route (blocage YouTube) : après 3 s sans avancer, le secours reprend à la même seconde. */
+function watchStall(deck: Deck, entry: QueueEntry, token: number): void {
+  if (!proxyEnabled || !useEmbedSettings.getState().enabled) return;
+  let last = deck.audio.currentTime;
+  let since = Date.now();
+  const timer = setInterval(() => {
+    if (token !== loadToken || embedActive()) { clearInterval(timer); return; }
+    const a = deck.audio;
+    if (a.paused || a.ended) { since = Date.now(); last = a.currentTime; return; }
+    if (a.currentTime > last + 0.05) { last = a.currentTime; since = Date.now(); return; }
+    if (Date.now() - since < 3000) return;
+    clearInterval(timer);
+    const at = a.currentTime;
+    void deck.engine.stop().catch(() => {});
+    lastEmbedAt = Date.now();
+    trackLog.w('flux direct figé : lecteur de secours', entry.track.videoId);
+    void playEmbedded(entry.track.videoId, {
+      onState: (state) => { if (token === loadToken || embedActive()) usePlayer.setState({ status: state, error: null }); },
+      onEnded: () => { if (token === loadToken) void advance(true).then(intent); },
+      onError: () => { if (token === loadToken) usePlayer.setState({ status: 'error', error: 'Lecture indisponible' }); },
+    }, at).then(() => usePlayer.setState({ status: 'playing', error: null })).catch(() => {});
+  }, 500);
+}
 
 /** Loads queue[at] into the deck in front and plays it. `auto` marks a move the player made on its own. */
 async function startAt(at: number, { startSec = 0, auto = false, autoplay = true } = {}): Promise<void> {
@@ -696,6 +720,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
     // Pas d'autoplay, ou démarrage refusé par le navigateur : le titre est chargé, le bouton lecture le lancera.
     if (!autoplay || deck.audio.paused) usePlayer.setState({ status: 'paused' });
     afterTrackStarted();
+    watchStall(deck, entry, token);
   } catch (error) {
     if (token !== loadToken || (error instanceof Error && error.name === 'SupersededError')) return;
     const message = error instanceof Error ? error.message : String(error);
