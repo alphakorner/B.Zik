@@ -265,3 +265,50 @@ export function soundSpectrum(): Uint8Array | null {
   for (const ch of chains.values()) if (!ch.audio.paused) return ch.spectrum();
   return null;
 }
+
+
+// ---- Petit son de chargement (bulle douce) ------------------------------------------------------
+// Synthétisé en direct (aucun fichier) : une goutte sinusoïdale très légère + un écho filtré, niveau bas.
+let loadBus: { out: GainNode; timer: number } | null = null;
+
+function bubble(c: AudioContext, dest: AudioNode, t: number, f: number) {
+  const o = c.createOscillator(); const g = c.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(f, t);
+  o.frequency.exponentialRampToValueAtTime(f * 1.9, t + 0.09);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.5, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  o.connect(g).connect(dest); o.start(t); o.stop(t + 0.2);
+}
+
+export function startLoadingSound(): void {
+  if (loadBus) return;
+  const c = context();
+  if (!c || c.state !== 'running') return;
+  const out = c.createGain();
+  out.gain.value = 0.0001;
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200;
+  const echo = c.createDelay(0.5); echo.delayTime.value = 0.18;
+  const fb = c.createGain(); fb.gain.value = 0.28;
+  const wet = c.createGain(); wet.gain.value = 0.35;
+  lp.connect(out); lp.connect(echo); echo.connect(fb).connect(echo); echo.connect(wet).connect(out);
+  out.connect(c.destination);
+  out.gain.exponentialRampToValueAtTime(0.05, c.currentTime + 0.12); // très léger
+  const notes = [523.25, 659.25, 783.99, 659.25];
+  let i = 0;
+  const tick = () => { bubble(c, lp, c.currentTime + 0.02, notes[i++ % notes.length]!); };
+  tick();
+  loadBus = { out, timer: window.setInterval(tick, 620) };
+}
+
+export function stopLoadingSound(): void {
+  const b = loadBus; if (!b) return;
+  loadBus = null;
+  clearInterval(b.timer);
+  const c = context();
+  try {
+    if (c) { b.out.gain.cancelScheduledValues(c.currentTime); b.out.gain.setValueAtTime(Math.max(b.out.gain.value, 0.0001), c.currentTime); b.out.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.08); }
+    setTimeout(() => { try { b.out.disconnect(); } catch { /* ignoré */ } }, 200);
+  } catch { /* ignoré */ }
+}

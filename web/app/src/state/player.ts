@@ -1,4 +1,4 @@
-import { attachSound, unlockSound } from '@/playback/sound';
+import { startLoadingSound, stopLoadingSound, attachSound, unlockSound } from '@/playback/sound';
 import { embedActive, embedSeek, embedSetVolume, embedToggle, playEmbedded, stopEmbedded, useEmbedSettings } from '@/playback/embed';
 import { proxyEnabled } from '@/lib/proxy';
 import type { DetectedExtension } from '@opentune/shared/bridge';
@@ -1122,3 +1122,16 @@ export const partyPlayer = {
   },
 };
 
+
+// Petit son de chargement : seulement si le chargement dure (>300 ms), coupé net dès que le flux arrive.
+let loadSoundTimer: number | undefined;
+usePlayer.subscribe((state, prev) => {
+  if (state.status === prev.status) return;
+  if (state.status === 'loading') {
+    clearTimeout(loadSoundTimer);
+    loadSoundTimer = window.setTimeout(() => { if (usePlayer.getState().status === 'loading') startLoadingSound(); }, 300);
+  } else {
+    clearTimeout(loadSoundTimer);
+    stopLoadingSound();
+  }
+});

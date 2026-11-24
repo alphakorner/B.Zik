@@ -491,3 +491,11 @@
    short fade and lift, as the panel itself slides in when it opens. */
 @keyframes ot-panel-swap { from { opacity: 0; transform: translateY(10px); } }
 .ot-panel-swap { animation: ot-panel-swap .26s var(--ease-out-panel) both; }
+
+/* Chargement du titre : pochette qui respire + fine barre lumineuse dans le mini-lecteur */
+.ot-mini { position: relative; overflow: hidden; }
+.ot-mini[data-loading] .ot-mini-track img { animation: ot-cover-breathe 1.4s ease-in-out infinite; }
+.ot-mini-load { position: absolute; left: 14px; right: 14px; bottom: 3px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: ot-load-sweep 1.1s ease-in-out infinite; }
+@keyframes ot-cover-breathe { 0%, 100% { opacity: .65; transform: scale(.97); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes ot-load-sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+@media (prefers-reduced-motion: reduce) { .ot-mini[data-loading] .ot-mini-track img, .ot-mini-load { animation: none; } }
