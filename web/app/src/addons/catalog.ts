@@ -1,5 +1,6 @@
 import { currentConfig, refreshConfig } from '@/config/remote';
 import { endpoint, type Addon } from '@opentune/shared/addons';
+import { proxyEnabled } from '@/lib/proxy';
 
 /** Where the site says the owner's server is; the catalog is only ever read from one of these. */
 const CONFIG_URL = 'https://alphakorner.github.io/B.Zik/usage-config.json';
@@ -47,6 +48,8 @@ let running: Promise<Published[]> | null = null;
 
 /** The published list, from the Worker the site's config names (and only that Worker). */
 export async function fetchPublished(force = false): Promise<Published[] | null> {
+  // Version web B.Zik (mode proxy) : pas de catalogue de sources tiers piloté par le serveur d'OpenTune.
+  if (proxyEnabled) return null;
   await refreshConfig(force);
   const configured = currentConfig().data.sources;
   if (configured !== null) return publishedOf({ sources: configured });

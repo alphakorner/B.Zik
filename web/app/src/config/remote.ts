@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { defaults, verifyConfig } from './protocol';
+import { proxyEnabled } from '@/lib/proxy';
 
 const ORIGIN = 'https://addon-opentune.rethinknow.in';
 const KEY = 'opentune:remote-config';
@@ -26,6 +27,8 @@ async function get(path: string) {
   finally { await reader.cancel().catch(() => {}); }
 }
 export async function refreshConfig(force = false): Promise<void> {
+  // Version web B.Zik (mode proxy) : aucun appel vers les serveurs d'OpenTune (vie privée + CORS). Valeurs par défaut intégrées.
+  if (proxyEnabled) return;
   await initialize();
   if (useRemoteConfig.getState().config.expiresAt <= Date.now()) useRemoteConfig.setState({ config: defaults() });
   if (running) return running;

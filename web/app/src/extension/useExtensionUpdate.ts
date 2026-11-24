@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { config } from '@/config';
+import { proxyEnabled } from '@/lib/proxy';
 import { useExtension } from './useExtension';
 
 /** Where a published zip is served: the site's downloads folder, its name escaped (it has spaces and brackets). */
@@ -31,6 +32,7 @@ export function compareVersions(a: string, b: string): number {
 }
 
 async function fetchPublished(): Promise<PublishedExtension | null> {
+  if (proxyEnabled) return null; // pas d'extension en mode web direct
   const response = await fetch(config.extensionManifestUrl, { cache: 'no-store' });
   if (!response.ok) return null;
   const body = (await response.json()) as Partial<PublishedExtension>;

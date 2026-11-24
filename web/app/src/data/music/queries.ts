@@ -148,7 +148,7 @@ export function useSuggestions(input: string) {
 /** Warms the first query of a page, for links' hover/focus prefetch (prompt §3). */
 export function prefetchPageData(pathname: string): void {
   const detected = queryClient.getQueryData<DetectedExtension | null>(extensionQueryKey);
-  if (!detected?.info.capabilities.includes('yt')) return;
+  if (!proxyEnabled && !detected?.info.capabilities.includes('yt')) return;
   const [, kind, id] = pathname.split('/');
   if (!id) {
     if (kind === 'home') void queryClient.prefetchInfiniteQuery(homeQuery());

@@ -1,7 +1,9 @@
 import { fetchJson, findLossless, reportLoadFailures, useAddons, type LosslessResult } from '@/addons/client';
 import { findJioSaavn, type SaavnStream } from '@/addons/jiosaavn';
 import { SabrStreamingAdapter } from 'googlevideo/sabr-streaming-adapter';
-import { buildSabrFormat } from 'googlevideo/utils';
+import { buildSabrFormat, isGoogleVideoURL } from 'googlevideo/utils';
+import { getBridge } from '@/extension/bridge';
+import { proxyEnabled, viaProxy } from '@/lib/proxy';
 import shaka from 'shaka-player/dist/shaka-player.compiled';
 import { Constants, Utils, YT, type Innertube } from 'youtubei.js/web';
 import { timed, trackLog } from '../trackLog';
@@ -130,6 +132,14 @@ export class YouTubeEngine {
         },
       },
     });
+    // Sans extension : les URLs directes googlevideo (clients VISIONOS, YTMUSIC, addons) passent par le proxy B.Zik.
+    // Le chemin SABR a son propre filtre (ShakaPlayerAdapter), appliqué après la construction du corps SABR : on le laisse faire.
+    if (proxyEnabled && !getBridge()) {
+      player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
+        if (this.adapter) return;
+        request.uris = request.uris.map((u) => (isGoogleVideoURL(u) ? viaProxy(u) : u));
+      });
+    }
     await player.attach(this.audio);
     player.addEventListener('error', (event) => this.onShakaError((event as unknown as { detail: shaka.util.Error }).detail));
     this.player = player;

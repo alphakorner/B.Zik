@@ -1,3 +1,4 @@
+import { proxyEnabled } from '@/lib/proxy';
 import type { DetectedExtension } from '@opentune/shared/bridge';
 import { create } from 'zustand';
 import type { Track } from '@/data/music/types';
@@ -167,6 +168,8 @@ function applyVolumes() {
 }
 
 function extensionReady(): boolean {
+  // Version web B.Zik : la lecture passe par le proxy Cloudflare, l'extension n'est pas requise.
+  if (proxyEnabled) return true;
   const detected = queryClient.getQueryData<DetectedExtension | null>(extensionQueryKey);
   return !!detected?.info.capabilities.includes('yt');
 }

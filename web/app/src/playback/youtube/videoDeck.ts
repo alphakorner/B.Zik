@@ -3,6 +3,8 @@ import { useAddons } from '@/addons/client';
 import { getVideoElement, useVideo } from '@/state/video';
 import { trackLog } from '../trackLog';
 import type { YouTubeEngine } from './engine';
+import { getBridge } from '@/extension/bridge';
+import { proxyEnabled } from '@/lib/proxy';
 
 /**
  * A music video's picture, as Apple Music plays one: a second Shaka player,
@@ -75,6 +77,8 @@ useAddons.subscribe((state, previous) => {
 
 async function refresh(): Promise<void> {
   const run = ++generation;
+  // Version web B.Zik sans extension : audio seul (la pochette reste affichée). La vidéo 1080p via le proxy épuiserait le quota du Worker.
+  if (proxyEnabled && !getBridge()) { await unload(); return; }
   const wanted = source && useVideo.getState().surfaces > 0 ? source : null;
   const stream = wanted ? await wanted.engine.videoStream().catch(() => null) : null;
   if (run !== generation) return;
