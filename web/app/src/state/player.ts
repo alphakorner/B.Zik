@@ -125,13 +125,34 @@ export function getAudio(): HTMLAudioElement | null {
   return decks?.[active]?.audio ?? null;
 }
 
+/**
+ * Les navigateurs stricts (Safari iPhone surtout) n'autorisent le son que pour un élément audio dont play() a été
+ * appelé DANS le geste de l'utilisateur. Les decks se créant après un import dynamique et des appels réseau, c'est
+ * trop tard : on crée donc les deux éléments ici, de façon synchrone au tap, et on les « déverrouille » avec un
+ * silence. Ils servent ensuite de decks (getDecks).
+ */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+let primedEls: HTMLAudioElement[] | null = null;
+function primeAudio(): HTMLAudioElement[] {
+  if (primedEls) return primedEls;
+  primedEls = [new Audio(), new Audio()];
+  for (const a of primedEls) {
+    try {
+      a.src = SILENT_WAV;
+      void a.play().then(() => { if (a.src === SILENT_WAV) a.pause(); }).catch(() => {});
+    } catch { /* tant pis : le chemin normal reste en place */ }
+  }
+  return primedEls;
+}
+
 function getDecks(): Promise<Deck[]> {
   decksPromise ??= (async () => {
     // Shaka, YouTube.js and googlevideo are the heavy part of the app; they
     // load on the first play, not with the page (prompt §3).
     const { YouTubeEngine } = await import('@/playback/youtube/engine');
     decks = [0, 1].map((n) => {
-      const audio = new Audio();
+      const audio = primedEls?.[n] ?? new Audio();
+      if (audio.src === SILENT_WAV) { audio.pause(); audio.removeAttribute('src'); audio.load(); }
       audio.preload = 'auto';
       // Media from another origin is silent inside an AudioContext unless it
       // is fetched with CORS (prompt §6, the Web Audio caveat).
@@ -551,6 +572,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
   const state = usePlayer.getState();
   const entry = state.queue[at];
   if (!entry) return;
+  primeAudio(); // synchrone, dans le geste de l'utilisateur
   cancelCrossfade();
   const token = ++loadToken;
   // Where this load starts; kept if it fails, so Try Again starts there too.
@@ -578,7 +600,8 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
     if (token !== loadToken) return;
     resumeSec = 0;
     applyTrack(track, entry.track);
-    if (!autoplay) usePlayer.setState({ status: 'paused' });
+    // Pas d'autoplay, ou démarrage refusé par le navigateur : le titre est chargé, le bouton lecture le lancera.
+    if (!autoplay || deck.audio.paused) usePlayer.setState({ status: 'paused' });
     afterTrackStarted();
   } catch (error) {
     if (token !== loadToken || (error instanceof Error && error.name === 'SupersededError')) return;
