@@ -1,0 +1,156 @@
+# Builds signed release APKs and attaches them to a GitHub release, either
+# when a tag like v0.2.0 is pushed, or when main has a versionName (in
+# app/build.gradle.kts) that has no release yet: bump the version, merge to
+# main, and the release follows.
+#
+# Signing: automatic (key generated once, private repo) or via secrets:
+#   OPENTUNE_KEYSTORE_BASE64   the keystore file, base64-encoded
+#   OPENTUNE_KEYSTORE_PASSWORD
+#   OPENTUNE_KEY_ALIAS
+#   OPENTUNE_KEY_PASSWORD
+# Missing signing material stops the release; debug-signed APKs are never published.
+name: B.Zik APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Merge-only commits can keep validation running without publishing.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Which release this is, and whether it already exists (then the rest is skipped).
+      - name: Version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="apk-v$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          gh release delete "$tag" --cleanup-tag -y > /dev/null 2>&1 || true
+
+      - uses: actions/setup-java@v4
+        if: steps.version.outputs.skip != 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # compileSdk 37 (InnerTubeX's AAR is built against it) and the build
+      # tools. The packages are named because the action's default list
+      # includes "tools", which the current SDK manager no longer has.
+      - uses: android-actions/setup-android@v3
+        if: steps.version.outputs.skip != 'true'
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.skip != 'true'
+
+      - name: Keystore
+        if: steps.version.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEYSTORE_BASE64: ${{ secrets.OPENTUNE_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          KS="$RUNNER_TEMP/release.keystore"
+          # Clé éphémère générée à chaque build : jamais commitée (repo public).
+          KS_PASS=$(openssl rand -hex 16)
+          echo "::add-mask::$KS_PASS"
+          keytool -genkeypair -keystore "$KS" -alias alphakorner -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$KS_PASS" -keypass "$KS_PASS" \
+            -dname "CN=Brice Jacotet, OU=Alpha Korner, O=Groupe Alpha Nex Strasbourg, L=Strasbourg, C=FR"
+          echo "KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
+          echo "OPENTUNE_KEYSTORE=$KS" >> "$GITHUB_ENV"
+
+      # Renommage en B.Zik + URLs du repo d'origine -> alphakorner, faits au moment du build.
+      - name: Rebrand B.Zik
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          SRC="app core wear tv"
+          # 1) URLs / User-Agent / lien Discord du projet d'origine
+          grep -rlE 'justshivv|aerluc|discord\.gg/6udrCVh5n' $SRC --include=*.kt --include=*.xml --include=*.json \
+            | grep '/src/main/' | xargs -r sed -i \
+              -e 's#justshivv\.github\.io/Opentune#alphakorner.github.io/B.Zik#g' \
+              -e 's#justshivv\.github\.io#alphakorner.github.io#g' \
+              -e 's#/Opentune/together#/B.Zik/together#g' \
+              -e 's#justshivv/[Oo]pentune#alphakorner/B.Zik#g' \
+              -e 's#https://discord\.gg/6udrCVh5n#https://alpha-korner.com#g' \
+              -e 's#justshivv#alphakorner#g'
+          # 1b) Fichiers deja patches a la main : le repo s'appelle B.Zik
+          grep -rlE 'alphakorner/opentune|alphakorner\.github\.io/opentune|/opentune/(together|pair)' $SRC --include=*.kt --include=*.xml \
+            | grep '/src/main/' | xargs -r sed -i \
+              -e 's#alphakorner/opentune#alphakorner/B.Zik#g' \
+              -e 's#alphakorner\.github\.io/opentune#alphakorner.github.io/B.Zik#g' \
+              -e 's#/opentune/\(together\|pair\)#/B.Zik/\1#g'
+          # 2) Nom de l'app : OpenTune -> B.Zik (mot isole seulement : les classes OpenTuneTheme,
+          #    Theme.OpenTune, com.opentune et le pont JavaScript Discord restent intacts)
+          find $SRC -path '*/src/main/*' \( -name '*.kt' -o -name '*.xml' -o -name '*.json' \) \
+              -not -path '*/build/*' -not -name 'DiscordLogin.kt' -print0 \
+            | xargs -0 perl -pi -e 's/(?<![\w.\/@-])OpenTune(?!\w)/B.Zik/g unless /^\s*\}, "OpenTune"\)/'
+          echo "Residus justshivv : $(grep -rlE 'justshivv|aerluc' $SRC --include=*.kt --include=*.xml | grep -c '/src/main/' || true)"
+          grep -n 'name="app_name"' app/src/main/res/values/strings.xml
+
+      - name: Build
+        if: steps.version.outputs.skip != 'true'
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET: ${{ secrets.LASTFM_API_SECRET }}
+          DISCORD_APP_ID: ${{ vars.DISCORD_APP_ID || secrets.DISCORD_APP_ID }}
+          OPENTUNE_KEYSTORE_PASSWORD: ${{ secrets.OPENTUNE_KEYSTORE_PASSWORD || env.KS_PASS }}
+          OPENTUNE_KEY_ALIAS: ${{ secrets.OPENTUNE_KEY_ALIAS || 'alphakorner' }}
+          OPENTUNE_KEY_PASSWORD: ${{ secrets.OPENTUNE_KEY_PASSWORD || env.KS_PASS }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Verify APK version
+        if: steps.version.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for apk in app/build/outputs/apk/release/*.apk tv/build/outputs/apk/release/*.apk; do
+            "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | sed -n '1p' > "$RUNNER_TEMP/apk-version.txt"
+            grep -F "versionName='${TAG#apk-v}'" "$RUNNER_TEMP/apk-version.txt"
+          done
+
+      - name: Name the APKs
+        if: steps.version.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          mkdir dist
+          for f in app/build/outputs/apk/release/*.apk; do
+            abi=$(basename "$f" .apk | sed -e 's/^app-//' -e 's/-release$//')
+            cp "$f" "dist/B.Zik-${TAG}-${abi}.apk"
+          done
+          # The TV app is its own APK, for Android TV and Google TV.
+          cp tv/build/outputs/apk/release/tv-release.apk "dist/B.Zik-TV-${TAG}.apk"
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+
+      - name: GitHub release
+        if: steps.version.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        # From main this also creates the tag, on the commit that was built.
+        run: |
+          if [ -f "docs/releases/${TAG#v}.md" ]; then
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --prerelease --title "B.Zik APK $TAG" --notes-file "docs/releases/${TAG#v}.md"
+          else
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --prerelease --title "B.Zik APK $TAG" --generate-notes
+          fi
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
