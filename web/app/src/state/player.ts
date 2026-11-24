@@ -1,3 +1,5 @@
+import { attachSound, unlockSound } from '@/playback/sound';
+import { embedActive, embedSeek, embedSetVolume, embedToggle, playEmbedded, stopEmbedded, useEmbedSettings } from '@/playback/embed';
 import { proxyEnabled } from '@/lib/proxy';
 import type { DetectedExtension } from '@opentune/shared/bridge';
 import { create } from 'zustand';
@@ -173,6 +175,7 @@ function getDecks(): Promise<Deck[]> {
         applyTrack(track, entry?.track.videoId === track.videoId ? entry.track : undefined);
       };
       bindElement(deck, n);
+      attachSound(audio);
       return deck;
     });
     applyVolumes();
@@ -186,6 +189,7 @@ function getDecks(): Promise<Deck[]> {
 function applyVolumes() {
   const { volume, muted } = usePlayer.getState();
   for (const deck of decks ?? []) deck.audio.volume = muted ? 0 : Math.min(1, Math.max(0, volume * deck.gain));
+  embedSetVolume(muted ? 0 : volume);
 }
 
 function extensionReady(): boolean {
@@ -446,6 +450,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
     const { nowPlaying, status, index } = get();
     if (!nowPlaying) return;
     if (partyHooks?.intercept({ kind: 'toggle' })) return;
+    if (embedActive()) { embedToggle(); intent(); return; }
     if (!audio || status === 'error') {
       // A stopped or failed track starts again from where it was.
       void startAt(index, { startSec: audio?.currentTime ?? resumeSec });
@@ -467,6 +472,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
       return;
     }
     if (partyHooks?.intercept({ kind: 'seek', ms: seconds * 1000 })) return;
+    if (embedActive()) { embedSeek(seconds); intent(); return; }
     cancelCrossfade();
     audio.currentTime = Math.max(0, Math.min(seconds, audio.duration || seconds));
     updatePositionState();
@@ -567,12 +573,58 @@ function insertUser(tracks: Track[], source: QueueSource | null, isNext: boolean
 
 // ---- Loading and moving through the queue -------------------------------------------
 
+// ---- Lecteur de secours (lecteur intégré YouTube) -------------------------------------------------
+
+let lastEmbedAt = 0;
+
+/** Mode web : si le flux direct ne démarre pas assez vite, on passe au lecteur de secours plutôt que d'attendre. */
+function withBudget<T>(deck: Deck, load: Promise<T>): Promise<T> {
+  if (!proxyEnabled || !useEmbedSettings.getState().enabled) return load;
+  const ms = Date.now() - lastEmbedAt < 180_000 ? 7000 : 14000;
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => { void deck.engine.stop().catch(() => {}); reject(new Error('Flux direct trop lent')); }, ms);
+    load.then((v) => { clearTimeout(timer); resolve(v); }, (e: unknown) => { clearTimeout(timer); reject(e); });
+  });
+}
+
+/** Joue le titre dans le lecteur YouTube intégré (vidéo visible). Vrai quand il a pris la main. */
+async function embedFallback(entry: QueueEntry, token: number): Promise<boolean> {
+  if (!proxyEnabled || !useEmbedSettings.getState().enabled) return false;
+  try {
+    const all = decks ?? [];
+    for (const d of all) void d.engine.stop().catch(() => {});
+    cancelCrossfade();
+    if (token !== loadToken) return true;
+    lastEmbedAt = Date.now();
+    trackLog.w('flux direct indisponible : lecteur YouTube de secours', entry.track.videoId);
+    await playEmbedded(entry.track.videoId, {
+      onState: (state) => { if (token === loadToken || embedActive()) usePlayer.setState({ status: state, error: null }); },
+      onEnded: () => { if (token === loadToken) void advance(true).then(intent); },
+      onError: (code) => {
+        if (token !== loadToken) return;
+        stopEmbedded();
+        usePlayer.setState({ status: 'error', error: code === 101 || code === 150 ? 'Ce titre n’est pas lisible en mode intégré' : 'Lecture indisponible' });
+        if (planNext(true)) setTimeout(() => { if (token === loadToken) void advance(true); }, 1500);
+      },
+    });
+    usePlayer.setState({ status: 'playing', error: null });
+    return true;
+  } catch (error) {
+    trackLog.w(`lecteur de secours indisponible : ${String(error)}`, entry.track.videoId);
+    return false;
+  }
+}
+
+
+
 /** Loads queue[at] into the deck in front and plays it. `auto` marks a move the player made on its own. */
 async function startAt(at: number, { startSec = 0, auto = false, autoplay = true } = {}): Promise<void> {
   const state = usePlayer.getState();
   const entry = state.queue[at];
   if (!entry) return;
   primeAudio(); // synchrone, dans le geste de l'utilisateur
+  unlockSound();
+  stopEmbedded();
   const prevStatus = usePlayer.getState().status;
   cancelCrossfade();
   const token = ++loadToken;
@@ -602,7 +654,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
       applyVolumes();
       fade = { token, frame: 0, pending: true };
       try {
-        const track = await back.engine.load(entry.track.videoId, { startSec: 0, autoplay: true, hint: searchHintOf(entry.track) });
+        const track = await withBudget(back, back.engine.load(entry.track.videoId, { startSec: 0, autoplay: true, hint: searchHintOf(entry.track) }));
         if (token !== loadToken) return;
         fade.pending = false;
         const from = front0;
@@ -637,7 +689,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
     all[1 - active]!.engine.stop().catch(() => {});
     deck.gain = 1;
     applyVolumes();
-    const track = await deck.engine.load(entry.track.videoId, { startSec, autoplay, hint: searchHintOf(entry.track) });
+    const track = await withBudget(deck, deck.engine.load(entry.track.videoId, { startSec, autoplay, hint: searchHintOf(entry.track) }));
     if (token !== loadToken) return;
     resumeSec = 0;
     applyTrack(track, entry.track);
@@ -647,6 +699,8 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
   } catch (error) {
     if (token !== loadToken || (error instanceof Error && error.name === 'SupersededError')) return;
     const message = error instanceof Error ? error.message : String(error);
+    if (await embedFallback(entry, token)) return;
+    if (token !== loadToken) return;
     usePlayer.setState({ status: 'error', error: message });
     // A track the player reached on its own that can't play is skipped, as on the phone.
     if (auto && planNext(true)) {

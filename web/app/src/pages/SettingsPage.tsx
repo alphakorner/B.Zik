@@ -1,4 +1,5 @@
-import { ArrowUpRight, AudioLines, ChevronRight, Info, Mic2, MonitorSmartphone, Palette, Play, Plug, Smartphone, Users, type LucideIcon } from 'lucide-react';
+import { useEmbedSettings } from '@/playback/embed';
+import { ArrowUpRight, AudioLines, SlidersHorizontal, ChevronRight, Info, Mic2, MonitorSmartphone, Palette, Play, Plug, Smartphone, Users, type LucideIcon } from 'lucide-react';
 import { Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { lazyRecovering } from '@/lib/staleBuild';
 import { MdOutlineExtension } from 'react-icons/md';
@@ -196,6 +197,8 @@ export default function SettingsPage() {
   const connectView = useConnect((s) => s.view);
   const autoplay = usePlayer((s) => s.autoplay);
   const crossfadeSec = usePlayer((s) => s.crossfadeSec);
+  const embedOn = useEmbedSettings((s) => s.enabled);
+  const setEmbedOn = useEmbedSettings((s) => s.setEnabled);
   const shareHistory = useHistorySettings((s) => s.share);
   const setShareHistory = useHistorySettings((s) => s.setShare);
   const { setAutoplay, setCrossfade } = usePlayer.getState();
@@ -226,6 +229,7 @@ export default function SettingsPage() {
 
           <Section id="audio" title="Audio">
             <section className={settingsUi.group}>
+              <LinkRow to="/settings/sound" icon={<Glyph Icon={SlidersHorizontal} color="#8e5bd8" />} title="Sound Studio" value="Égaliseur, basses, master" />
               <LinkRow to="/settings/addons" icon={<Glyph Icon={AudioLines} color="#e5483a" />} title="Audio sources" value={sourcesText} />
             </section>
             <p className={settingsUi.footer}>Lossless FLAC from add-ons and 320 kbps from JioSaavn, in the order you choose. YouTube Music is the fallback.</p>
@@ -233,6 +237,7 @@ export default function SettingsPage() {
 
           <Section id="playback" title="Playback">
             <section className={settingsUi.group}>
+              <Toggle label="Lecteur de secours YouTube" detail="Si un titre ne démarre pas, il est joué par le lecteur officiel YouTube (la vidéo s’affiche dans une carte, comme l’exigent les conditions de YouTube)." checked={embedOn} onChange={setEmbedOn} />
               <Toggle label="AutoPlay" detail="When the queue ends, keep playing similar music." checked={autoplay} onChange={setAutoplay} />
               <label className={settingsUi.controlRow}>
                 <span className={settingsUi.rowText}>
